@@ -84,6 +84,10 @@ export async function listCourtsNearby(
   return MOCK_COURTS;
 }
 
+export function getMockCourts(): Court[] {
+  return MOCK_COURTS;
+}
+
 export function formatCourtMeta(court: Court): string {
   const typeLabel = court.court_type
     ? `${court.court_type.charAt(0).toUpperCase()}${court.court_type.slice(1)}`
