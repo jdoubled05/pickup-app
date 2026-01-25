@@ -66,7 +66,6 @@ export async function getCourtById(id: string): Promise<Court | null> {
   const fallback = MOCK_COURTS.find((court) => court.id === id) ?? null;
 
   // TODO: Replace with Supabase query once the courts table is live.
-  // Example:
   // const { data, error } = await supabase.from("courts").select("*").eq("id", id).single();
   // if (error) return fallback;
   // return data ?? fallback;
@@ -79,9 +78,40 @@ export async function listCourtsNearby(
   radiusMeters: number
 ): Promise<Court[]> {
   // TODO: Replace with Supabase RPC for geo queries once PostGIS is enabled.
-  // Example:
   // const { data, error } = await supabase.rpc("courts_nearby", { lat, lon, radius_meters: radiusMeters });
   // if (error) return MOCK_COURTS;
   // return data ?? MOCK_COURTS;
   return MOCK_COURTS;
+}
+
+export function formatCourtMeta(court: Court): string {
+  const typeLabel = court.court_type
+    ? `${court.court_type.charAt(0).toUpperCase()}${court.court_type.slice(1)}`
+    : "Court";
+  const hoops = court.number_of_hoops ?? "?";
+  const lighting =
+    court.lighting === null || court.lighting === undefined
+      ? "Lighting unknown"
+      : court.lighting
+      ? "Lighting"
+      : "No lighting";
+
+  return `${typeLabel} • ${hoops} hoops • ${lighting}`;
+}
+
+export function formatLastVerified(court: Court): string | null {
+  if (!court.last_verified_at) {
+    return null;
+  }
+
+  const date = new Date(court.last_verified_at);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
