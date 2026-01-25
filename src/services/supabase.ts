@@ -6,11 +6,16 @@ export type SupabaseEnvStatus = {
 };
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const supabaseAnonKey =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.EXPO_PUBLIC_SUPABASE_LEGACY_ANON_KEY ??
+  "";
 
 const missing: string[] = [];
 if (!supabaseUrl) missing.push("EXPO_PUBLIC_SUPABASE_URL");
-if (!supabaseAnonKey) missing.push("EXPO_PUBLIC_SUPABASE_ANON_KEY");
+if (!supabaseAnonKey) {
+  missing.push("EXPO_PUBLIC_SUPABASE_ANON_KEY or EXPO_PUBLIC_SUPABASE_LEGACY_ANON_KEY");
+}
 
 const isConfigured = missing.length === 0;
 
