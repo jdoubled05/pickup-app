@@ -11,6 +11,7 @@ import {
   formatIndoor,
   listCourtsNearby,
 } from "@/src/services/courts";
+import { getForegroundLocationOrDefault } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 
 export default function CourtsIndex() {
@@ -18,6 +19,9 @@ export default function CourtsIndex() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [locationSource, setLocationSource] = useState<"device" | "default">(
+    "default"
+  );
   const supabaseStatus = getSupabaseEnvStatus();
 
   const loadCourts = useCallback(async (isRefresh = false) => {
@@ -29,8 +33,13 @@ export default function CourtsIndex() {
     setError(null);
 
     try {
-      // TODO: Replace with device location once geolocation is enabled.
-      const data = await listCourtsNearby(33.749, -84.388, 50000);
+      const location = await getForegroundLocationOrDefault();
+      setLocationSource(location.source);
+      const data = await listCourtsNearby(
+        location.coords.lat,
+        location.coords.lon,
+        50000
+      );
       setCourts(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
@@ -55,6 +64,11 @@ export default function CourtsIndex() {
       </Text>
       <Text className="mt-1 text-white/50">
         {supabaseStatus.configured ? "Live data" : "Mock data"}
+      </Text>
+      <Text className="mt-1 text-white/50">
+        {locationSource === "device"
+          ? "Using device location"
+          : "Using default location (Atlanta)"}
       </Text>
 
       <View className="mt-4">
