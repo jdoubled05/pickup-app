@@ -95,7 +95,11 @@ export default function MapsTest() {
       return;
     }
     setRecenterLocked(true);
-    setRecenterSignal((value) => value + 1);
+    setRecenterSignal((value) => {
+      const nextValue = value + 1;
+      console.log("[maps] recenter", { recenterSignal: nextValue });
+      return nextValue;
+    });
     setTimeout(() => setRecenterLocked(false), 700);
   };
 

@@ -19,6 +19,7 @@ export function CourtsMap({
     center.lon,
     center.lat,
   ]);
+  const [zoom, setZoom] = useState(11.5);
   const courtsWithCoords = useMemo(
     () =>
       courts.filter(
@@ -47,6 +48,9 @@ export function CourtsMap({
   useEffect(() => {
     if (typeof recenterSignal === "number") {
       setCameraCenter([center.lon, center.lat]);
+      setZoom(11.6);
+      const t = setTimeout(() => setZoom(11.5), 50);
+      return () => clearTimeout(t);
     }
   }, [recenterSignal, center.lat, center.lon]);
 
@@ -84,7 +88,7 @@ export function CourtsMap({
       compassEnabled
     >
       <MapLibreGL.Camera
-        zoomLevel={11.5}
+        zoomLevel={zoom}
         centerCoordinate={cameraCenter}
         animationMode="flyTo"
         animationDuration={600}
