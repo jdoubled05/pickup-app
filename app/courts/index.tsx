@@ -36,7 +36,8 @@ export default function CourtsIndex() {
     setError(null);
 
     try {
-      const data = await listCourtsNearby(38.9072, -77.0369, 5000);
+      // TODO: Replace with device location once geolocation is enabled.
+      const data = await listCourtsNearby(33.749, -84.388, 50000);
       setCourts(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
