@@ -1,11 +1,11 @@
 # Phase 2 Implementation Plan (Data + Maps)
 
-## Milestone 1: Supabase integration
-Goal: Establish a safe data layer scaffold with configuration, schema docs, and migrations.
-Files to touch: src/services/supabase.ts, src/services/courts.ts, docs/SUPABASE_SCHEMA.md, supabase/migrations/001_create_courts.sql
-Acceptance criteria: Supabase config reads env vars; courts service returns mocked data when unconfigured; schema docs and migration align.
-Rollback plan: Revert the commit to remove Supabase scaffolding and docs.
-Suggested commit message: feat: add supabase foundation and schema docs
+## Milestone 1: Supabase foundation
+Goal: Add a Supabase client scaffold with env validation and a mock-first courts data layer.
+Files to touch: src/services/supabase.ts, src/services/courts.ts, package.json (dependency)
+Acceptance criteria: Supabase client initializes from env vars; dev throws a clear error when misconfigured; courts service returns mock data by default.
+Rollback plan: Revert the commit to remove the Supabase client and courts service.
+Suggested commit message: feat: add supabase client scaffold
 
 ## Milestone 2: Courts list
 Goal: Add a courts list route that renders mocked data and links to details.
