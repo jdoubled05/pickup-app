@@ -12,8 +12,12 @@ export default function Home() {
       </Text>
 
       <View className="mt-8">
+        <Link href="/courts" asChild>
+          <Button title="Browse Courts" />
+        </Link>
+
         <Link href="/courts/123" asChild>
-          <Button title="Go to Court Details (id=123)" />
+          <Button title="Go to Court Details (id=123)" className="mt-3" />
         </Link>
 
         <Link href="/maps-test" asChild>
