@@ -10,23 +10,31 @@ export async function getForegroundLocationOrDefault(): Promise<{
   error?: string;
 }> {
   try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        return {
+          coords: DEFAULT_CENTER,
+          source: "default",
+          error: "Location permission not granted.",
+        };
+      }
+
+      const position = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      return {
+        coords: { lat: position.coords.latitude, lon: position.coords.longitude },
+        source: "device",
+      };
+    } catch (err) {
       return {
         coords: DEFAULT_CENTER,
         source: "default",
-        error: "Location permission not granted.",
+        error: err instanceof Error ? err.message : "expo-location unavailable.",
       };
     }
-
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-
-    return {
-      coords: { lat: position.coords.latitude, lon: position.coords.longitude },
-      source: "device",
-    };
   } catch (err) {
     return {
       coords: DEFAULT_CENTER,
