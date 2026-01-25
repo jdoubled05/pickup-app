@@ -47,13 +47,13 @@ export default function CourtDetails() {
           <Text className="text-xl font-semibold">{court.name}</Text>
           <Text className="mt-2 text-white/70">{court.address ?? "Address unknown"}</Text>
           <Text className="mt-4 text-white/70">
-            Type: {court.courtType ?? "Unknown"}
+            Type: {court.court_type ?? "Unknown"}
           </Text>
           <Text className="mt-2 text-white/70">
-            Surface: {court.surfaceType ?? "Unknown"}
+            Surface: {court.surface_type ?? "Unknown"}
           </Text>
           <Text className="mt-2 text-white/70">
-            Hoops: {court.numberOfHoops ?? "Unknown"}
+            Hoops: {court.number_of_hoops ?? "Unknown"}
           </Text>
           <Text className="mt-2 text-white/70">
             Lighting:{" "}
@@ -62,6 +62,12 @@ export default function CourtDetails() {
               : court.lighting
               ? "Yes"
               : "No"}
+          </Text>
+          <Text className="mt-2 text-white/70">
+            Hours: {court.open_hours ?? "Unknown"}
+          </Text>
+          <Text className="mt-2 text-white/70">
+            Last Verified: {court.last_verified_at ?? "Unknown"}
           </Text>
           <Text className="mt-2 text-white/70">
             Coordinates: {court.latitude}, {court.longitude}
