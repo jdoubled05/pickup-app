@@ -4,9 +4,9 @@ export type Court = {
   latitude: number;
   longitude: number;
   address: string | null;
-  court_type: string | null;
+  indoor: boolean | null;
   surface_type: string | null;
-  number_of_hoops: number | null;
+  num_hoops: number | null;
   lighting: boolean | null;
   open_hours: string | null;
   last_verified_at: string | null;
@@ -20,9 +20,9 @@ export type DbCourt = {
   latitude?: number | null;
   longitude?: number | null;
   address?: string | null;
-  court_type?: string | null;
+  indoor?: boolean | null;
   surface_type?: string | null;
-  number_of_hoops?: number | null;
+  num_hoops?: number | null;
   lighting?: boolean | null;
   open_hours?: string | null;
   last_verified_at?: string | null;
@@ -107,9 +107,9 @@ export function mapDbCourtToCourt(row: DbCourt): Court {
     latitude,
     longitude,
     address: row.address ?? null,
-    court_type: row.court_type ?? null,
+    indoor: row.indoor ?? null,
     surface_type: row.surface_type ?? null,
-    number_of_hoops: row.number_of_hoops ?? null,
+    num_hoops: row.num_hoops ?? null,
     lighting: row.lighting ?? null,
     open_hours: row.open_hours ?? null,
     last_verified_at: row.last_verified_at ?? null,
@@ -124,9 +124,9 @@ export function mapDbCourtNearbyToCourt(row: DbCourtNearby): Court {
     latitude: row.latitude,
     longitude: row.longitude,
     address: row.address ?? null,
-    court_type: row.court_type ?? null,
+    indoor: row.indoor ?? null,
     surface_type: row.surface_type ?? null,
-    number_of_hoops: row.number_of_hoops ?? null,
+    num_hoops: row.num_hoops ?? null,
     lighting: row.lighting ?? null,
     open_hours: row.open_hours ?? null,
     last_verified_at: row.last_verified_at ?? null,

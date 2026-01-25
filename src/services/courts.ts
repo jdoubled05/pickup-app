@@ -16,9 +16,9 @@ export const MOCK_COURTS: Court[] = [
     latitude: 37.7596,
     longitude: -122.4148,
     address: "2450 Harrison St, San Francisco, CA",
-    court_type: "outdoor",
+    indoor: false,
     surface_type: "asphalt",
-    number_of_hoops: 4,
+    num_hoops: 4,
     lighting: true,
     open_hours: "6am - 10pm",
     last_verified_at: "2024-05-10T18:00:00Z",
@@ -30,9 +30,9 @@ export const MOCK_COURTS: Court[] = [
     latitude: 37.7598,
     longitude: -122.4269,
     address: "Dolores St & 19th St, San Francisco, CA",
-    court_type: "outdoor",
+    indoor: false,
     surface_type: "concrete",
-    number_of_hoops: 2,
+    num_hoops: 2,
     lighting: false,
     open_hours: "Sunrise - Sunset",
     last_verified_at: "2024-05-08T17:30:00Z",
@@ -44,9 +44,9 @@ export const MOCK_COURTS: Court[] = [
     latitude: 37.7716,
     longitude: -122.4481,
     address: "Fell St & Stanyan St, San Francisco, CA",
-    court_type: "outdoor",
+    indoor: false,
     surface_type: "asphalt",
-    number_of_hoops: 6,
+    num_hoops: 6,
     lighting: true,
     open_hours: "6am - 11pm",
     last_verified_at: "2024-05-12T16:45:00Z",
@@ -76,23 +76,6 @@ export async function getCourtById(id: string): Promise<Court | null> {
         return mapDbCourtNearbyToCourt(rpcRow as DbCourtNearby);
       }
     }
-
-    const { data, error } = await supabase
-      .from("courts")
-      .select(
-        "id,name,latitude,longitude,address,court_type,surface_type,number_of_hoops,lighting,open_hours,last_verified_at,created_at,location,geom"
-      )
-      .eq("id", id)
-      .single();
-
-    if (error || !data) {
-      if (__DEV__ && error) {
-        console.warn("Supabase getCourtById error:", error.message);
-      }
-      return fallback;
-    }
-
-    return mapDbCourtToCourt(data as DbCourt);
   } catch (err) {
     if (__DEV__) {
       console.warn("Supabase getCourtById failed:", err);
@@ -145,10 +128,13 @@ export function getMockCourts(): Court[] {
 }
 
 export function formatCourtMeta(court: Court): string {
-  const typeLabel = court.court_type
-    ? `${court.court_type.charAt(0).toUpperCase()}${court.court_type.slice(1)}`
-    : "Court";
-  const hoops = court.number_of_hoops ?? "?";
+  const typeLabel =
+    court.indoor === null || court.indoor === undefined
+      ? "Court"
+      : court.indoor
+      ? "Indoor"
+      : "Outdoor";
+  const hoops = court.num_hoops ?? "?";
   const lighting =
     court.lighting === null || court.lighting === undefined
       ? "Lighting unknown"

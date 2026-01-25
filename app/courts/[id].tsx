@@ -90,13 +90,18 @@ export default function CourtDetails() {
 
           <Section title="Details">
             <Text className="mt-2 text-white/70">
-              Type: {court.court_type ?? "Unknown"}
+              Indoor:{" "}
+              {court.indoor === null || court.indoor === undefined
+                ? "Unknown"
+                : court.indoor
+                ? "Yes"
+                : "No"}
             </Text>
             <Text className="mt-2 text-white/70">
               Surface: {court.surface_type ?? "Unknown"}
             </Text>
             <Text className="mt-2 text-white/70">
-              Hoops: {court.number_of_hoops ?? "Unknown"}
+              Hoops: {court.num_hoops ?? "Unknown"}
             </Text>
             <Text className="mt-2 text-white/70">
               Lighting:{" "}

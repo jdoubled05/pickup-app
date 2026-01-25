@@ -85,8 +85,13 @@ export default function CourtsIndex() {
           onRefresh={() => loadCourts(true)}
           ListEmptyComponent={<Text className="text-white/70">No courts found yet.</Text>}
           renderItem={({ item }) => {
-            const courtType = item.court_type ?? "court";
-            const hoops = item.number_of_hoops ?? "?";
+            const courtType =
+              item.indoor === null || item.indoor === undefined
+                ? "court"
+                : item.indoor
+                ? "indoor"
+                : "outdoor";
+            const hoops = item.num_hoops ?? "?";
             const lighting =
               item.lighting === null || item.lighting === undefined
                 ? "lighting unknown"
