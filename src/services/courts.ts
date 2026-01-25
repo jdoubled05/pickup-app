@@ -1,32 +1,32 @@
-import { isSupabaseConfigured, supabaseFetch } from "@/src/services/supabase";
-
 export type Court = {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
-  address?: string | null;
-  courtType?: string | null;
-  surfaceType?: string | null;
-  numberOfHoops?: number | null;
-  lighting?: boolean | null;
-  openHours?: string | null;
-  lastVerifiedAt?: string | null;
+  address: string | null;
+  court_type: string | null;
+  surface_type: string | null;
+  number_of_hoops: number | null;
+  lighting: boolean | null;
+  open_hours: string | null;
+  last_verified_at: string | null;
+  created_at: string | null;
 };
 
-const mockCourts: Court[] = [
+const MOCK_COURTS: Court[] = [
   {
     id: "123",
     name: "Mission Playground",
     latitude: 37.7596,
     longitude: -122.4148,
     address: "2450 Harrison St, San Francisco, CA",
-    courtType: "outdoor",
-    surfaceType: "asphalt",
-    numberOfHoops: 4,
+    court_type: "outdoor",
+    surface_type: "asphalt",
+    number_of_hoops: 4,
     lighting: true,
-    openHours: "6am - 10pm",
-    lastVerifiedAt: "2024-05-10T18:00:00Z",
+    open_hours: "6am - 10pm",
+    last_verified_at: "2024-05-10T18:00:00Z",
+    created_at: "2024-01-10T18:00:00Z",
   },
   {
     id: "456",
@@ -34,49 +34,54 @@ const mockCourts: Court[] = [
     latitude: 37.7598,
     longitude: -122.4269,
     address: "Dolores St & 19th St, San Francisco, CA",
-    courtType: "outdoor",
-    surfaceType: "concrete",
-    numberOfHoops: 2,
+    court_type: "outdoor",
+    surface_type: "concrete",
+    number_of_hoops: 2,
     lighting: false,
-    openHours: "Sunrise - Sunset",
-    lastVerifiedAt: "2024-05-08T17:30:00Z",
+    open_hours: "Sunrise - Sunset",
+    last_verified_at: "2024-05-08T17:30:00Z",
+    created_at: "2024-01-08T17:30:00Z",
+  },
+  {
+    id: "789",
+    name: "Panhandle Courts",
+    latitude: 37.7716,
+    longitude: -122.4481,
+    address: "Fell St & Stanyan St, San Francisco, CA",
+    court_type: "outdoor",
+    surface_type: "asphalt",
+    number_of_hoops: 6,
+    lighting: true,
+    open_hours: "6am - 11pm",
+    last_verified_at: "2024-05-12T16:45:00Z",
+    created_at: "2024-01-12T16:45:00Z",
   },
 ];
 
-export async function getCourtById(id: string) {
+export async function getCourtById(id: string): Promise<Court | null> {
   if (!id) {
     return null;
   }
 
-  const fallback = mockCourts.find((court) => court.id === id) ?? null;
+  const fallback = MOCK_COURTS.find((court) => court.id === id) ?? null;
 
-  if (!isSupabaseConfigured) {
-    return fallback;
-  }
-
-  try {
-    const rows = await supabaseFetch<Court[]>(
-      `/rest/v1/courts?id=eq.${encodeURIComponent(id)}&select=*`
-    );
-    return rows[0] ?? fallback;
-  } catch {
-    return fallback;
-  }
+  // TODO: Replace with Supabase query once the courts table is live.
+  // Example:
+  // const { data, error } = await supabase.from("courts").select("*").eq("id", id).single();
+  // if (error) return fallback;
+  // return data ?? fallback;
+  return fallback;
 }
 
-export async function listCourtsNearby(lat: number, lon: number, radiusMeters: number) {
-  if (!isSupabaseConfigured) {
-    return mockCourts;
-  }
-
-  try {
-    const rows = await supabaseFetch<Court[]>("/rest/v1/courts?select=*");
-    if (rows.length > 0) {
-      return rows;
-    }
-  } catch {
-    return mockCourts;
-  }
-
-  return mockCourts;
+export async function listCourtsNearby(
+  lat: number,
+  lon: number,
+  radiusMeters: number
+): Promise<Court[]> {
+  // TODO: Replace with Supabase RPC for geo queries once PostGIS is enabled.
+  // Example:
+  // const { data, error } = await supabase.rpc("courts_nearby", { lat, lon, radius_meters: radiusMeters });
+  // if (error) return MOCK_COURTS;
+  // return data ?? MOCK_COURTS;
+  return MOCK_COURTS;
 }
