@@ -27,3 +27,4 @@ Files to touch: app/maps-test.tsx, src/components/MapView.tsx (new), app/_layout
 Acceptance criteria: MapLibre renders on iOS simulator without crashing; navigation to /maps-test works; map can be removed cleanly.
 Rollback plan: Remove map component import and revert maps-test to static scaffold.
 Suggested commit message: feat: reintroduce MapLibre map scaffold
+Notes: Requires @maplibre/maplibre-react-native and a dev-client rebuild after install.
