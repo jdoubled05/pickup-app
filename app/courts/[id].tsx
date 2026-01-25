@@ -4,6 +4,7 @@ import { Link, useLocalSearchParams } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
 import { Section } from "@/src/components/ui/Section";
+import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import {
   Court,
   formatCourtMeta,
@@ -17,6 +18,7 @@ export default function CourtDetails() {
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabaseStatus = getSupabaseEnvStatus();
 
   const loadCourt = useCallback(async () => {
     if (!courtId) {
@@ -52,6 +54,9 @@ export default function CourtDetails() {
       ) : error ? (
         <View>
           <Text className="text-2xl font-bold">Court Details</Text>
+          <Text className="mt-1 text-white/50">
+            {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+          </Text>
           <Text className="mt-2 text-white/70">Error: {error}</Text>
           <View className="mt-6">
             <Button title="Retry" onPress={loadCourt} variant="secondary" />
@@ -60,6 +65,9 @@ export default function CourtDetails() {
       ) : court ? (
         <View>
           <Text className="text-3xl font-bold">{court.name}</Text>
+          <Text className="mt-1 text-white/50">
+            {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+          </Text>
           <Text className="mt-2 text-white/70">{court.address ?? "Address unknown"}</Text>
           <Text className="mt-3 text-white/60">{formatCourtMeta(court)}</Text>
 
@@ -96,10 +104,21 @@ export default function CourtDetails() {
               {formatLastVerified(court) ?? "Not verified yet"}
             </Text>
           </Section>
+
+          <Section title="Coordinates">
+            <Text className="text-white/70">
+              {court.latitude !== null && court.longitude !== null
+                ? `${court.latitude}, ${court.longitude}`
+                : "Unknown"}
+            </Text>
+          </Section>
         </View>
       ) : (
         <View>
           <Text className="text-2xl font-bold">Court Details</Text>
+          <Text className="mt-1 text-white/50">
+            {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+          </Text>
           <Text className="mt-2 text-white/70">Court not found.</Text>
           <View className="mt-6">
             <Link href="/courts" asChild>

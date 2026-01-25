@@ -1,40 +1,43 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FlatList, Pressable, View } from "react-native";
 import { Link } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
+import { Button } from "@/src/components/ui/Button";
 import { Court, listCourtsNearby } from "@/src/services/courts";
+import { getSupabaseEnvStatus } from "@/src/services/supabase";
 
 export default function CourtsIndex() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const supabaseStatus = getSupabaseEnvStatus();
+
+  const loadCourts = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      const data = await listCourtsNearby(38.9072, -77.0369, 5000);
+      setCourts(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load courts.");
+    } finally {
+      if (isRefresh) {
+        setRefreshing(false);
+      } else {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadCourts = async () => {
-      try {
-        const data = await listCourtsNearby(38.9072, -77.0369, 5000);
-        if (isMounted) {
-          setCourts(data);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : "Failed to load courts.");
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     loadCourts();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  }, [loadCourts]);
 
   return (
     <View className="flex-1 bg-black px-6 py-6">
@@ -42,6 +45,17 @@ export default function CourtsIndex() {
       <Text className="mt-2 text-white/70">
         Nearby courts powered by Supabase (mocked for now).
       </Text>
+      <Text className="mt-1 text-white/50">
+        {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+      </Text>
+
+      <View className="mt-4">
+        <Button
+          title={refreshing ? "Refreshing..." : "Refresh"}
+          variant="secondary"
+          onPress={() => loadCourts(true)}
+        />
+      </View>
 
       {loading ? (
         <Text className="mt-6 text-white/70">Loading courts...</Text>
@@ -52,6 +66,8 @@ export default function CourtsIndex() {
           className="mt-6"
           data={courts}
           keyExtractor={(item) => item.id}
+          refreshing={refreshing}
+          onRefresh={() => loadCourts(true)}
           ListEmptyComponent={<Text className="text-white/70">No courts found yet.</Text>}
           renderItem={({ item }) => {
             const courtType = item.court_type ?? "court";
