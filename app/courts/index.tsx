@@ -96,7 +96,10 @@ export default function CourtsIndex() {
             const distance = formatDistance(item.distanceMeters);
 
             return (
-              <Link href={`/courts/${item.id}`} asChild>
+              <Link
+                href={{ pathname: "/courts/[id]", params: { id: item.id } }}
+                asChild
+              >
                 <Pressable className="mb-3 rounded-2xl border border-white/10 bg-white/5 p-4">
                   <Text className="text-lg font-semibold">{item.name}</Text>
                   <Text className="mt-1 text-white/70">{item.address ?? "Address unknown"}</Text>
