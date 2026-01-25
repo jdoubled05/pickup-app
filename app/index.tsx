@@ -1,18 +1,28 @@
 import { View } from "react-native";
+import { Link } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
 
 export default function Home() {
   return (
-    <View className="flex-1 items-center justify-center bg-black px-6">
-      <Text className="text-2xl font-bold">Pickup</Text>
-      <Text className="mt-2 text-white/70 text-center">
+    <View className="flex-1 justify-center bg-black px-6">
+      <Text className="text-3xl font-bold">Pickup</Text>
+      <Text className="mt-2 text-white/70">
         NativeWind baseline is stable ✅
       </Text>
 
-      <View className="mt-6 w-full">
-        <Button title="Primary Action" onPress={() => {}} />
-        <Button title="Secondary" variant="secondary" className="mt-3" onPress={() => {}} />
+      <View className="mt-8">
+        <Link href="/courts/123" asChild>
+          <Button title="Go to Court Details (id=123)" />
+        </Link>
+
+        <Link href="/maps-test" asChild>
+          <Button
+            title="Open Maps Test"
+            variant="secondary"
+            className="mt-3"
+          />
+        </Link>
       </View>
     </View>
   );
