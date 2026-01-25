@@ -1,8 +1,8 @@
 export type Court = {
   id: string;
   name: string;
-  latitude: number | null;
-  longitude: number | null;
+  latitude: number;
+  longitude: number;
   address: string | null;
   court_type: string | null;
   surface_type: string | null;
@@ -11,6 +11,7 @@ export type Court = {
   open_hours: string | null;
   last_verified_at: string | null;
   created_at: string | null;
+  distanceMeters?: number;
 };
 
 export type DbCourt = {
@@ -28,6 +29,12 @@ export type DbCourt = {
   created_at?: string | null;
   location?: unknown | null;
   geom?: unknown | null;
+};
+
+export type DbCourtNearby = DbCourt & {
+  latitude: number;
+  longitude: number;
+  distance_meters?: number | null;
 };
 
 type Coordinates = { latitude: number | null; longitude: number | null };
@@ -91,12 +98,14 @@ function extractCoordinates(row: DbCourt): Coordinates {
 
 export function mapDbCourtToCourt(row: DbCourt): Court {
   const coords = extractCoordinates(row);
+  const latitude = coords.latitude ?? Number.NaN;
+  const longitude = coords.longitude ?? Number.NaN;
 
   return {
     id: row.id,
     name: row.name ?? "Unknown court",
-    latitude: coords.latitude,
-    longitude: coords.longitude,
+    latitude,
+    longitude,
     address: row.address ?? null,
     court_type: row.court_type ?? null,
     surface_type: row.surface_type ?? null,
@@ -105,5 +114,26 @@ export function mapDbCourtToCourt(row: DbCourt): Court {
     open_hours: row.open_hours ?? null,
     last_verified_at: row.last_verified_at ?? null,
     created_at: row.created_at ?? null,
+  };
+}
+
+export function mapDbCourtNearbyToCourt(row: DbCourtNearby): Court {
+  return {
+    id: row.id,
+    name: row.name ?? "Unknown court",
+    latitude: row.latitude,
+    longitude: row.longitude,
+    address: row.address ?? null,
+    court_type: row.court_type ?? null,
+    surface_type: row.surface_type ?? null,
+    number_of_hoops: row.number_of_hoops ?? null,
+    lighting: row.lighting ?? null,
+    open_hours: row.open_hours ?? null,
+    last_verified_at: row.last_verified_at ?? null,
+    created_at: row.created_at ?? null,
+    distanceMeters:
+      row.distance_meters === null || row.distance_meters === undefined
+        ? undefined
+        : row.distance_meters,
   };
 }
