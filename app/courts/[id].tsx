@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { Link, useLocalSearchParams } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
+import { Section } from "@/src/components/ui/Section";
 import {
   Court,
   formatCourtMeta,
@@ -66,8 +67,7 @@ export default function CourtDetails() {
             <Button title="Refresh" onPress={loadCourt} variant="secondary" />
           </View>
 
-          <View className="mt-8">
-            <Text className="text-lg font-semibold">Details</Text>
+          <Section title="Details">
             <Text className="mt-2 text-white/70">
               Type: {court.court_type ?? "Unknown"}
             </Text>
@@ -85,21 +85,17 @@ export default function CourtDetails() {
                 ? "Yes"
                 : "No"}
             </Text>
-          </View>
+          </Section>
 
-          <View className="mt-6">
-            <Text className="text-lg font-semibold">Hours</Text>
-            <Text className="mt-2 text-white/70">
-              {court.open_hours ?? "Not provided"}
-            </Text>
-          </View>
+          <Section title="Hours">
+            <Text className="text-white/70">{court.open_hours ?? "Not provided"}</Text>
+          </Section>
 
-          <View className="mt-6">
-            <Text className="text-lg font-semibold">Verification</Text>
-            <Text className="mt-2 text-white/70">
+          <Section title="Verification">
+            <Text className="text-white/70">
               {formatLastVerified(court) ?? "Not verified yet"}
             </Text>
-          </View>
+          </Section>
         </View>
       ) : (
         <View>
