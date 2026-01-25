@@ -1,4 +1,10 @@
-import { Court, DbCourt, mapDbCourtToCourt } from "@/src/types/db";
+import {
+  Court,
+  DbCourt,
+  DbCourtNearby,
+  mapDbCourtNearbyToCourt,
+  mapDbCourtToCourt,
+} from "@/src/types/db";
 import { getSupabaseEnvStatus, supabase } from "@/src/services/supabase";
 
 export type { Court } from "@/src/types/db";
@@ -48,30 +54,6 @@ export const MOCK_COURTS: Court[] = [
   },
 ];
 
-const EARTH_RADIUS_METERS = 6371000;
-
-function toRadians(value: number) {
-  return (value * Math.PI) / 180;
-}
-
-function distanceMeters(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-) {
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return EARTH_RADIUS_METERS * c;
-}
-
 export async function getCourtById(id: string): Promise<Court | null> {
   if (!id) {
     return null;
@@ -85,9 +67,21 @@ export async function getCourtById(id: string): Promise<Court | null> {
   }
 
   try {
+    const rpcResponse = await supabase.rpc("court_by_id", { court_id: id });
+    if (rpcResponse.data && !rpcResponse.error) {
+      const rpcRow = Array.isArray(rpcResponse.data)
+        ? rpcResponse.data[0]
+        : rpcResponse.data;
+      if (rpcRow) {
+        return mapDbCourtNearbyToCourt(rpcRow as DbCourtNearby);
+      }
+    }
+
     const { data, error } = await supabase
       .from("courts")
-      .select("*")
+      .select(
+        "id,name,latitude,longitude,address,court_type,surface_type,number_of_hoops,lighting,open_hours,last_verified_at,created_at,location,geom"
+      )
       .eq("id", id)
       .single();
 
@@ -117,71 +111,33 @@ export async function listCourtsNearby(
     return MOCK_COURTS;
   }
 
-  const latDelta = radiusMeters / 111320;
-  const lonDelta = radiusMeters / (111320 * Math.cos(toRadians(lat)) || 1);
-  let rows: DbCourt[] | null = null;
-
   try {
-    const { data, error } = await supabase
-      .from("courts")
-      .select("*")
-      .gte("latitude", lat - latDelta)
-      .lte("latitude", lat + latDelta)
-      .gte("longitude", lon - lonDelta)
-      .lte("longitude", lon + lonDelta)
-      .limit(200);
+    const { data, error } = await supabase.rpc("courts_nearby", {
+      lat,
+      lon,
+      radius_meters: radiusMeters,
+      limit_count: 100,
+    });
 
     if (error) {
       if (__DEV__) {
-        console.warn("Supabase listCourtsNearby error:", error.message);
+        console.warn("Supabase courts_nearby RPC error:", error.message);
       }
-    } else {
-      rows = data as DbCourt[];
+      return MOCK_COURTS;
     }
+
+    const rows = (data ?? []) as DbCourtNearby[];
+    if (rows.length === 0) {
+      return MOCK_COURTS;
+    }
+
+    return rows.map(mapDbCourtNearbyToCourt);
   } catch (err) {
     if (__DEV__) {
-      console.warn("Supabase listCourtsNearby failed:", err);
+      console.warn("Supabase courts_nearby RPC failed:", err);
     }
-  }
-
-  if (!rows) {
-    // TODO: Prefer a PostGIS RPC like courts_nearby once available.
-    try {
-      const { data, error } = await supabase.rpc("courts_nearby", {
-        lat,
-        lon,
-        radius_meters: radiusMeters,
-      });
-
-      if (error) {
-        if (__DEV__) {
-          console.warn("Supabase courts_nearby RPC error:", error.message);
-        }
-      } else {
-        rows = data as DbCourt[];
-      }
-    } catch (err) {
-      if (__DEV__) {
-        console.warn("Supabase courts_nearby RPC failed:", err);
-      }
-    }
-  }
-
-  if (!rows) {
     return MOCK_COURTS;
   }
-
-  const mapped = rows.map(mapDbCourtToCourt);
-  const filtered = mapped.filter((court) => {
-    if (court.latitude === null || court.longitude === null) {
-      return false;
-    }
-    return (
-      distanceMeters(lat, lon, court.latitude, court.longitude) <= radiusMeters
-    );
-  });
-
-  return filtered.length > 0 ? filtered : mapped;
 }
 
 export function getMockCourts(): Court[] {

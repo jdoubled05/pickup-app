@@ -12,7 +12,7 @@ const DC_CENTER: [number, number] = [-77.0369, 38.9072];
 export function CourtsMap({ courts }: CourtsMapProps) {
   const points = courts.filter(
     (court) =>
-      typeof court.latitude === "number" && typeof court.longitude === "number"
+      Number.isFinite(court.latitude) && Number.isFinite(court.longitude)
   );
 
   return (
