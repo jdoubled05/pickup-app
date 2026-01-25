@@ -13,8 +13,8 @@ import {
 } from "@/src/services/courts";
 
 export default function CourtDetails() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const courtId = Array.isArray(id) ? id[0] : id;
+  const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const courtId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +45,20 @@ export default function CourtDetails() {
 
   return (
     <View className="flex-1 bg-black px-6 py-6">
-      {loading ? (
+      {!courtId ? (
+        <View>
+          <Text className="text-2xl font-bold">Court Details</Text>
+          <Text className="mt-1 text-white/50">
+            {supabaseStatus.configured ? "Live data" : "Mock data"}
+          </Text>
+          <Text className="mt-2 text-white/70">Court not found.</Text>
+          <View className="mt-6">
+            <Link href="/courts" asChild>
+              <Button title="Back to Courts" variant="secondary" />
+            </Link>
+          </View>
+        </View>
+      ) : loading ? (
         <View>
           <Text className="text-2xl font-bold text-white/40">Loading court...</Text>
           <Text className="mt-3 text-white/20">Loading address...</Text>
