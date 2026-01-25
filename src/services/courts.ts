@@ -145,8 +145,8 @@ export async function listCourtsNearby(
     }
 
     const rows = (data ?? []) as DbCourtNearby[];
-    if (rows.length === 0) {
-      return MOCK_COURTS;
+    if (__DEV__ && rows.length === 0) {
+      console.log("[courts] live query returned 0 rows", { lat, lon, radiusMeters });
     }
 
     return rows.map(mapDbCourtNearbyToCourt);
