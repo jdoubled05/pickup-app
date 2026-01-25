@@ -22,6 +22,11 @@ export default function CourtsIndex() {
   const [locationSource, setLocationSource] = useState<"device" | "default">(
     "default"
   );
+  const [queryContext, setQueryContext] = useState<{
+    lat: number;
+    lon: number;
+    radiusMeters: number;
+  }>({ lat: 33.749, lon: -84.388, radiusMeters: 50000 });
   const supabaseStatus = getSupabaseEnvStatus();
 
   const loadCourts = useCallback(async (isRefresh = false) => {
@@ -35,10 +40,16 @@ export default function CourtsIndex() {
     try {
       const location = await getForegroundLocationOrDefault();
       setLocationSource(location.source);
+      const radiusMeters = 50000;
+      setQueryContext({
+        lat: location.coords.lat,
+        lon: location.coords.lon,
+        radiusMeters,
+      });
       const data = await listCourtsNearby(
         location.coords.lat,
         location.coords.lon,
-        50000
+        radiusMeters
       );
       setCourts(data);
     } catch (err) {
@@ -70,6 +81,11 @@ export default function CourtsIndex() {
           ? "Using device location"
           : "Using default location (Atlanta)"}
       </Text>
+      <Text className="mt-1 text-white/40">
+        {`source: ${locationSource} • ${queryContext.lat.toFixed(4)}, ${queryContext.lon.toFixed(
+          4
+        )} • ${(queryContext.radiusMeters / 1000).toFixed(0)} km`}
+      </Text>
 
       <View className="mt-4">
         <Button
@@ -90,7 +106,20 @@ export default function CourtsIndex() {
           keyExtractor={(item) => item.id}
           refreshing={refreshing}
           onRefresh={() => loadCourts(true)}
-          ListEmptyComponent={<Text className="text-white/70">No courts found yet.</Text>}
+          ListEmptyComponent={
+            <View>
+              <Text className="text-white/70">
+                {supabaseStatus.configured
+                  ? "No courts found near you."
+                  : "No courts found yet."}
+              </Text>
+              {supabaseStatus.configured ? (
+                <Text className="mt-2 text-white/50">
+                  Try increasing radius or changing simulator location.
+                </Text>
+              ) : null}
+            </View>
+          }
           renderItem={({ item }) => {
             const courtType = formatIndoor(item.indoor).toLowerCase();
             const hoops = formatHoops(item.num_hoops);
