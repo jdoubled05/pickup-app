@@ -45,24 +45,36 @@ class MapErrorBoundary extends React.Component<MapErrorBoundaryProps, MapErrorBo
 export default function MapsTest() {
   const router = useRouter();
   const [center, setCenter] = React.useState(DEFAULT_CENTER);
+  const [locationSource, setLocationSource] = React.useState<"device" | "default">(
+    "default"
+  );
   const [courts, setCourts] = React.useState<Court[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [recenterSignal, setRecenterSignal] = React.useState(0);
   const [recenterLocked, setRecenterLocked] = React.useState(false);
 
+  const fetchCourts = React.useCallback(async (coords: { lat: number; lon: number }) => {
+    const data = await listCourtsNearby(coords.lat, coords.lon, 50000);
+    setCourts(data);
+  }, []);
+
+  const recenterToDevice = React.useCallback(async () => {
+    const result = await getForegroundLocationOrDefault();
+    setCenter(result.coords);
+    setLocationSource(result.source);
+    await fetchCourts(result.coords);
+    setRecenterSignal((value) => value + 1);
+  }, [fetchCourts]);
+
   const loadCourts = React.useCallback(async () => {
     setLoading(true);
     setError(null);
     const location = await getForegroundLocationOrDefault();
     setCenter(location.coords);
+    setLocationSource(location.source);
     try {
-      const data = await listCourtsNearby(
-        location.coords.lat,
-        location.coords.lon,
-        50000
-      );
-      setCourts(data);
+      await fetchCourts(location.coords);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
     } finally {
@@ -90,17 +102,13 @@ export default function MapsTest() {
     router.push({ pathname: "/courts/[id]", params: { id: courtId } });
   };
 
-  const handleRecenter = () => {
+  const handleRecenter = async () => {
     if (recenterLocked) {
       return;
     }
     setRecenterLocked(true);
-    setRecenterSignal((value) => {
-      const nextValue = value + 1;
-      console.log("[maps] recenter", { recenterSignal: nextValue });
-      return nextValue;
-    });
-    setTimeout(() => setRecenterLocked(false), 700);
+    await recenterToDevice();
+    setTimeout(() => setRecenterLocked(false), 800);
   };
 
   const mappableCourts = React.useMemo(
@@ -136,7 +144,16 @@ export default function MapsTest() {
           <Button
             title={loading ? "Loading..." : "Refresh"}
             variant="secondary"
-            onPress={loadCourts}
+            onPress={async () => {
+              setLoading(true);
+              try {
+                await fetchCourts(center);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Failed to load courts.");
+              } finally {
+                setLoading(false);
+              }
+            }}
           />
           <Button
             title="Recenter"
@@ -144,6 +161,11 @@ export default function MapsTest() {
             onPress={handleRecenter}
           />
         </View>
+        <Text className="mt-2 text-white/60">
+          {locationSource === "device"
+            ? "Centered on your location"
+            : "Using default location"}
+        </Text>
       </View>
       {!loading && courts.length === 0 ? (
         <View className="absolute left-0 right-0 top-20 px-6">
