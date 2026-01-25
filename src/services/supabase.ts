@@ -1,43 +1,44 @@
-export type SupabaseConfig = {
-  url: string;
-  anonKey: string;
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+export type SupabaseEnvStatus = {
+  isConfigured: boolean;
+  missing: string[];
+  message: string;
 };
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
-export const supabaseConfig: SupabaseConfig = {
-  url: supabaseUrl,
-  anonKey: supabaseAnonKey,
-};
+const missing: string[] = [];
+if (!supabaseUrl) missing.push("EXPO_PUBLIC_SUPABASE_URL");
+if (!supabaseAnonKey) missing.push("EXPO_PUBLIC_SUPABASE_ANON_KEY");
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+const isConfigured = missing.length === 0;
 
-const baseHeaders = isSupabaseConfigured
-  ? {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
-    }
-  : {};
-
-export async function supabaseFetch<T>(path: string, init: RequestInit = {}) {
-  if (!isSupabaseConfigured) {
-    throw new Error("Supabase is not configured.");
+export function getSupabaseEnvStatus(): SupabaseEnvStatus {
+  if (__DEV__ && !isConfigured) {
+    throw new Error(
+      `Supabase is not configured. Set ${missing.join(
+        ", "
+      )} in your environment before using Supabase.`
+    );
   }
 
-  const response = await fetch(`${supabaseUrl}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...baseHeaders,
-      ...(init.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`Supabase request failed: ${message}`);
-  }
-
-  return (await response.json()) as T;
+  return {
+    isConfigured,
+    missing,
+    message: isConfigured
+      ? "Supabase env vars are configured."
+      : `Missing Supabase env vars: ${missing.join(", ")}`,
+  };
 }
+
+function buildSupabaseClient(): SupabaseClient | null {
+  if (!isConfigured) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
+
+export const supabase = buildSupabaseClient();
