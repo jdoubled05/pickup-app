@@ -1,0 +1,27 @@
+export type Court = {
+  id: string;
+  name: string;
+  description: string | null;
+  location: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
+  timezone: string | null;
+  indoor: boolean | null;
+  surface_type: string | null;
+  num_hoops: number | null;
+  lighting: boolean | null;
+  open_24h: boolean | null;
+  hours_json: unknown | null;
+  amenities_json: unknown | null;
+  photos_count: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  osm_type: string | null;
+  osm_id: string | null;
+  latitude?: number;
+  longitude?: number;
+  distance_meters?: number;
+};
