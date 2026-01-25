@@ -55,7 +55,7 @@ export default function CourtDetails() {
         <View>
           <Text className="text-2xl font-bold">Court Details</Text>
           <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+            {supabaseStatus.configured ? "Live data" : "Mock data"}
           </Text>
           <Text className="mt-2 text-white/70">Error: {error}</Text>
           <View className="mt-6">
@@ -66,7 +66,7 @@ export default function CourtDetails() {
         <View>
           <Text className="text-3xl font-bold">{court.name}</Text>
           <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+            {supabaseStatus.configured ? "Live data" : "Mock data"}
           </Text>
           <Text className="mt-2 text-white/70">{court.address ?? "Address unknown"}</Text>
           <Text className="mt-3 text-white/60">{formatCourtMeta(court)}</Text>
@@ -107,7 +107,7 @@ export default function CourtDetails() {
 
           <Section title="Coordinates">
             <Text className="text-white/70">
-              {court.latitude !== null && court.longitude !== null
+              {Number.isFinite(court.latitude) && Number.isFinite(court.longitude)
                 ? `${court.latitude}, ${court.longitude}`
                 : "Unknown"}
             </Text>
@@ -117,7 +117,7 @@ export default function CourtDetails() {
         <View>
           <Text className="text-2xl font-bold">Court Details</Text>
           <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+            {supabaseStatus.configured ? "Live data" : "Mock data"}
           </Text>
           <Text className="mt-2 text-white/70">Court not found.</Text>
           <View className="mt-6">

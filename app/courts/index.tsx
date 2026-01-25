@@ -13,6 +13,20 @@ export default function CourtsIndex() {
   const [error, setError] = useState<string | null>(null);
   const supabaseStatus = getSupabaseEnvStatus();
 
+  const formatDistance = (distanceMeters?: number) => {
+    if (distanceMeters === null || distanceMeters === undefined) {
+      return null;
+    }
+    const miles = distanceMeters / 1609.34;
+    if (!Number.isFinite(miles)) {
+      return null;
+    }
+    if (miles < 0.1) {
+      return "<0.1 mi";
+    }
+    return `${miles.toFixed(1)} mi`;
+  };
+
   const loadCourts = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
@@ -46,7 +60,7 @@ export default function CourtsIndex() {
         Nearby courts powered by Supabase (mocked for now).
       </Text>
       <Text className="mt-1 text-white/50">
-        {supabaseStatus.configured ? "Using live data" : "Using mock data"}
+        {supabaseStatus.configured ? "Live data" : "Mock data"}
       </Text>
 
       <View className="mt-4">
@@ -78,6 +92,7 @@ export default function CourtsIndex() {
                 : item.lighting
                 ? "lighting yes"
                 : "lighting no";
+            const distance = formatDistance(item.distanceMeters);
 
             return (
               <Link href={`/courts/${item.id}`} asChild>
@@ -86,6 +101,7 @@ export default function CourtsIndex() {
                   <Text className="mt-1 text-white/70">{item.address ?? "Address unknown"}</Text>
                   <Text className="mt-2 text-white/60">
                     {courtType} • {hoops} hoops • {lighting}
+                    {distance ? ` • ${distance}` : ""}
                   </Text>
                 </Pressable>
               </Link>
