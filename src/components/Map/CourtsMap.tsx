@@ -10,6 +10,11 @@ type CourtsMapProps = {
 const DC_CENTER: [number, number] = [-77.0369, 38.9072];
 
 export function CourtsMap({ courts }: CourtsMapProps) {
+  const points = courts.filter(
+    (court) =>
+      typeof court.latitude === "number" && typeof court.longitude === "number"
+  );
+
   return (
     <MapLibreGL.MapView
       style={{ flex: 1 }}
@@ -18,7 +23,7 @@ export function CourtsMap({ courts }: CourtsMapProps) {
       compassEnabled
     >
       <MapLibreGL.Camera zoomLevel={11.5} centerCoordinate={DC_CENTER} />
-      {courts.map((court) => (
+      {points.map((court) => (
         <MapLibreGL.PointAnnotation
           key={court.id}
           id={court.id}
