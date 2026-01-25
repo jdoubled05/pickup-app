@@ -1,6 +1,8 @@
 import React from "react";
 import { View } from "react-native";
+import { useRouter } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
+import { Button } from "@/src/components/ui/Button";
 import { CourtsMap } from "@/src/components/Map/CourtsMap";
 import { Court, listCourtsNearby } from "@/src/services/courts";
 import {
@@ -41,46 +43,65 @@ class MapErrorBoundary extends React.Component<MapErrorBoundaryProps, MapErrorBo
 }
 
 export default function MapsTest() {
+  const router = useRouter();
   const [center, setCenter] = React.useState(DEFAULT_CENTER);
   const [courts, setCourts] = React.useState<Court[]>([]);
   const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [cameraKey, setCameraKey] = React.useState(0);
+
+  const loadCourts = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const location = await getForegroundLocationOrDefault();
+    setCenter(location.coords);
+    try {
+      const data = await listCourtsNearby(
+        location.coords.lat,
+        location.coords.lon,
+        50000
+      );
+      setCourts(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load courts.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     let isMounted = true;
 
     const load = async () => {
-      const location = await getForegroundLocationOrDefault();
-      if (!isMounted) {
-        return;
-      }
-      setCenter(location.coords);
-      try {
-        const data = await listCourtsNearby(
-          location.coords.lat,
-          location.coords.lon,
-          50000
-        );
-        if (isMounted) {
-          setCourts(data);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : "Failed to load courts.");
-        }
-      }
+      await loadCourts();
     };
 
-    load();
+    if (isMounted) {
+      load();
+    }
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [loadCourts]);
+
+  const handleSelectCourt = (courtId: string) => {
+    router.push({ pathname: "/courts/[id]", params: { id: courtId } });
+  };
+
+  const handleRecenter = () => {
+    setCameraKey((value) => value + 1);
+  };
 
   return (
     <View className="flex-1 bg-black">
       <MapErrorBoundary>
-        <CourtsMap center={center} courts={courts} />
+        <CourtsMap
+          center={center}
+          courts={courts}
+          onSelectCourt={handleSelectCourt}
+          cameraKey={cameraKey}
+        />
       </MapErrorBoundary>
       <View className="absolute left-0 right-0 top-0 px-6 pt-6">
         <Text className="text-2xl font-bold">Maps Test</Text>
@@ -88,6 +109,25 @@ export default function MapsTest() {
           <Text className="mt-2 text-white/70">{error}</Text>
         ) : null}
       </View>
+      <View className="absolute right-0 top-0 px-6 pt-6">
+        <View className="flex-row gap-2">
+          <Button
+            title={loading ? "Loading..." : "Refresh"}
+            variant="secondary"
+            onPress={loadCourts}
+          />
+          <Button
+            title="Recenter"
+            variant="secondary"
+            onPress={handleRecenter}
+          />
+        </View>
+      </View>
+      {!loading && courts.length === 0 ? (
+        <View className="absolute left-0 right-0 top-20 px-6">
+          <Text className="text-white/70">No courts found near you.</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
