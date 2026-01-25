@@ -53,12 +53,14 @@ target 'pickupnativewindclean' do
   )
 
   post_install do |installer|
+# @generated begin @maplibre/maplibre-react-native:post-install - expo prebuild (DO NOT MODIFY) sync-6e76c80af0d70c0003d06822dd59b7c729fca472
+    $MLRN.post_install(installer)
+# @generated end @maplibre/maplibre-react-native:post-install
     react_native_post_install(
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false,
       :ccache_enabled => ccache_enabled?(podfile_properties),
     )
-    $MLRN.post_install(installer) if defined?($MLRN) && $MLRN.respond_to?(:post_install)
   end
 end
