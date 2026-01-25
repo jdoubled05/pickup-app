@@ -1,20 +1,24 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import MapLibreGL from "@maplibre/maplibre-react-native";
 import { Court } from "@/src/services/courts";
 
 type CourtsMapProps = {
   center: { lat: number; lon: number };
   courts: Court[];
+  recenterSignal?: number;
   onSelectCourt?: (courtId: string) => void;
-  cameraKey?: number;
 };
 
 export function CourtsMap({
   center,
   courts,
+  recenterSignal,
   onSelectCourt,
-  cameraKey = 0,
 }: CourtsMapProps) {
+  const [cameraCenter, setCameraCenter] = useState<[number, number]>([
+    center.lon,
+    center.lat,
+  ]);
   const courtsWithCoords = useMemo(
     () =>
       courts.filter(
@@ -35,6 +39,16 @@ export function CourtsMap({
       withCoords: courtsWithCoords.length,
     });
   }, [courts.length, courtsWithCoords.length]);
+
+  useEffect(() => {
+    setCameraCenter([center.lon, center.lat]);
+  }, [center.lat, center.lon]);
+
+  useEffect(() => {
+    if (typeof recenterSignal === "number") {
+      setCameraCenter([center.lon, center.lat]);
+    }
+  }, [recenterSignal, center.lat, center.lon]);
 
   const features = useMemo(
     () =>
@@ -70,9 +84,10 @@ export function CourtsMap({
       compassEnabled
     >
       <MapLibreGL.Camera
-        key={cameraKey}
         zoomLevel={11.5}
-        centerCoordinate={[center.lon, center.lat]}
+        centerCoordinate={cameraCenter}
+        animationMode="flyTo"
+        animationDuration={600}
       />
       <MapLibreGL.ShapeSource
         id="courts"

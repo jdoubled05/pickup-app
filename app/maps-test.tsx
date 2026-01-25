@@ -48,7 +48,8 @@ export default function MapsTest() {
   const [courts, setCourts] = React.useState<Court[]>([]);
   const [error, setError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [cameraKey, setCameraKey] = React.useState(0);
+  const [recenterSignal, setRecenterSignal] = React.useState(0);
+  const [recenterLocked, setRecenterLocked] = React.useState(false);
 
   const loadCourts = React.useCallback(async () => {
     setLoading(true);
@@ -90,7 +91,12 @@ export default function MapsTest() {
   };
 
   const handleRecenter = () => {
-    setCameraKey((value) => value + 1);
+    if (recenterLocked) {
+      return;
+    }
+    setRecenterLocked(true);
+    setRecenterSignal((value) => value + 1);
+    setTimeout(() => setRecenterLocked(false), 700);
   };
 
   const mappableCourts = React.useMemo(
@@ -112,7 +118,7 @@ export default function MapsTest() {
           center={center}
           courts={mappableCourts}
           onSelectCourt={handleSelectCourt}
-          cameraKey={cameraKey}
+          recenterSignal={recenterSignal}
         />
       </MapErrorBoundary>
       <View className="absolute left-0 right-0 top-0 px-6 pt-6">
