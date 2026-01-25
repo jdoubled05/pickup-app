@@ -93,12 +93,24 @@ export default function MapsTest() {
     setCameraKey((value) => value + 1);
   };
 
+  const mappableCourts = React.useMemo(
+    () =>
+      courts.filter(
+        (court) =>
+          typeof court.latitude === "number" &&
+          typeof court.longitude === "number" &&
+          Number.isFinite(court.latitude) &&
+          Number.isFinite(court.longitude)
+      ),
+    [courts]
+  );
+
   return (
     <View className="flex-1 bg-black">
       <MapErrorBoundary>
         <CourtsMap
           center={center}
-          courts={courts}
+          courts={mappableCourts}
           onSelectCourt={handleSelectCourt}
           cameraKey={cameraKey}
         />
@@ -126,6 +138,11 @@ export default function MapsTest() {
       {!loading && courts.length === 0 ? (
         <View className="absolute left-0 right-0 top-20 px-6">
           <Text className="text-white/70">No courts found near you.</Text>
+        </View>
+      ) : null}
+      {!loading && courts.length > 0 && mappableCourts.length === 0 ? (
+        <View className="absolute left-0 right-0 top-20 px-6">
+          <Text className="text-white/70">No mappable courts (missing coordinates).</Text>
         </View>
       ) : null}
     </View>

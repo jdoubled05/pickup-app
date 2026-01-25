@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
 import MapLibreGL from "@maplibre/maplibre-react-native";
 import { Court } from "@/src/services/courts";
@@ -17,15 +17,31 @@ export function CourtsMap({
   cameraKey = 0,
 }: CourtsMapProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const points = courts.filter(
-    (court) =>
-      Number.isFinite(court.latitude) && Number.isFinite(court.longitude)
+  const courtsWithCoords = useMemo(
+    () =>
+      courts.filter(
+        (court) =>
+          typeof court.latitude === "number" &&
+          typeof court.longitude === "number" &&
+          Number.isFinite(court.latitude) &&
+          Number.isFinite(court.longitude) &&
+          typeof court.id === "string" &&
+          court.id.length > 0
+      ),
+    [courts]
   );
 
   const handleSelect = (courtId: string) => {
     setSelectedId(courtId);
     onSelectCourt?.(courtId);
   };
+
+  useEffect(() => {
+    console.log("[CourtsMap] courts", {
+      total: courts.length,
+      withCoords: courtsWithCoords.length,
+    });
+  }, [courts.length, courtsWithCoords.length]);
 
   return (
     <MapLibreGL.MapView
@@ -39,7 +55,7 @@ export function CourtsMap({
         zoomLevel={11.5}
         centerCoordinate={[center.lon, center.lat]}
       />
-      {points.map((court) => (
+      {courtsWithCoords.map((court) => (
         <MapLibreGL.PointAnnotation
           key={court.id}
           id={court.id}
@@ -50,7 +66,7 @@ export function CourtsMap({
             className={
               selectedId === court.id
                 ? "h-4 w-4 rounded-full border border-white bg-white"
-                : "h-3 w-3 rounded-full border border-white/80 bg-[#960000]"
+                : "h-3 w-3 rounded-full bg-[#960000] border border-white"
             }
           />
         </MapLibreGL.PointAnnotation>
