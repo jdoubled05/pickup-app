@@ -3,7 +3,14 @@ import { FlatList, Pressable, View } from "react-native";
 import { Link } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
-import { Court, listCourtsNearby } from "@/src/services/courts";
+import {
+  Court,
+  formatAddress,
+  formatDistance,
+  formatHoops,
+  formatIndoor,
+  listCourtsNearby,
+} from "@/src/services/courts";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 
 export default function CourtsIndex() {
@@ -12,20 +19,6 @@ export default function CourtsIndex() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const supabaseStatus = getSupabaseEnvStatus();
-
-  const formatDistance = (distanceMeters?: number) => {
-    if (distanceMeters === null || distanceMeters === undefined) {
-      return null;
-    }
-    const miles = distanceMeters / 1609.34;
-    if (!Number.isFinite(miles)) {
-      return null;
-    }
-    if (miles < 0.1) {
-      return "<0.1 mi";
-    }
-    return `${miles.toFixed(1)} mi`;
-  };
 
   const loadCourts = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -85,20 +78,15 @@ export default function CourtsIndex() {
           onRefresh={() => loadCourts(true)}
           ListEmptyComponent={<Text className="text-white/70">No courts found yet.</Text>}
           renderItem={({ item }) => {
-            const courtType =
-              item.indoor === null || item.indoor === undefined
-                ? "court"
-                : item.indoor
-                ? "indoor"
-                : "outdoor";
-            const hoops = item.num_hoops ?? "?";
+            const courtType = formatIndoor(item.indoor).toLowerCase();
+            const hoops = formatHoops(item.num_hoops);
             const lighting =
               item.lighting === null || item.lighting === undefined
                 ? "lighting unknown"
                 : item.lighting
                 ? "lighting yes"
                 : "lighting no";
-            const distance = formatDistance(item.distanceMeters);
+            const distance = formatDistance(item.distance_meters);
 
             return (
               <Link
@@ -107,9 +95,9 @@ export default function CourtsIndex() {
               >
                 <Pressable className="mb-3 rounded-2xl border border-white/10 bg-white/5 p-4">
                   <Text className="text-lg font-semibold">{item.name}</Text>
-                  <Text className="mt-1 text-white/70">{item.address ?? "Address unknown"}</Text>
+                  <Text className="mt-1 text-white/70">{formatAddress(item)}</Text>
                   <Text className="mt-2 text-white/60">
-                    {courtType} • {hoops} hoops • {lighting}
+                    {courtType} • {hoops} • {lighting}
                     {distance ? ` • ${distance}` : ""}
                   </Text>
                 </Pressable>

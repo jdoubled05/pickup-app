@@ -7,8 +7,11 @@ import { Section } from "@/src/components/ui/Section";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import {
   Court,
+  formatAddress,
+  formatHours,
+  formatHoops,
+  formatIndoor,
   formatCourtMeta,
-  formatLastVerified,
   getCourtById,
 } from "@/src/services/courts";
 
@@ -81,7 +84,7 @@ export default function CourtDetails() {
           <Text className="mt-1 text-white/50">
             {supabaseStatus.configured ? "Live data" : "Mock data"}
           </Text>
-          <Text className="mt-2 text-white/70">{court.address ?? "Address unknown"}</Text>
+          <Text className="mt-2 text-white/70">{formatAddress(court)}</Text>
           <Text className="mt-3 text-white/60">{formatCourtMeta(court)}</Text>
 
           <View className="mt-5">
@@ -90,18 +93,13 @@ export default function CourtDetails() {
 
           <Section title="Details">
             <Text className="mt-2 text-white/70">
-              Indoor:{" "}
-              {court.indoor === null || court.indoor === undefined
-                ? "Unknown"
-                : court.indoor
-                ? "Yes"
-                : "No"}
+              {formatIndoor(court.indoor)}
             </Text>
             <Text className="mt-2 text-white/70">
               Surface: {court.surface_type ?? "Unknown"}
             </Text>
             <Text className="mt-2 text-white/70">
-              Hoops: {court.num_hoops ?? "Unknown"}
+              {formatHoops(court.num_hoops)}
             </Text>
             <Text className="mt-2 text-white/70">
               Lighting:{" "}
@@ -114,12 +112,16 @@ export default function CourtDetails() {
           </Section>
 
           <Section title="Hours">
-            <Text className="text-white/70">{court.open_hours ?? "Not provided"}</Text>
+            <Text className="text-white/70">
+              {court.open_24h ? "Open 24 hours" : formatHours(court.hours_json)}
+            </Text>
           </Section>
 
-          <Section title="Verification">
+          <Section title="Location">
             <Text className="text-white/70">
-              {formatLastVerified(court) ?? "Not verified yet"}
+              {court.city || court.state || court.postal_code
+                ? [court.city, court.state, court.postal_code].filter(Boolean).join(", ")
+                : "Not provided"}
             </Text>
           </Section>
 
