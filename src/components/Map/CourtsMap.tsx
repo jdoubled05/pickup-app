@@ -4,12 +4,11 @@ import MapLibreGL from "@maplibre/maplibre-react-native";
 import { Court } from "@/src/services/courts";
 
 type CourtsMapProps = {
+  center: { lat: number; lon: number };
   courts: Court[];
 };
 
-const DC_CENTER: [number, number] = [-77.0369, 38.9072];
-
-export function CourtsMap({ courts }: CourtsMapProps) {
+export function CourtsMap({ center, courts }: CourtsMapProps) {
   const points = courts.filter(
     (court) =>
       Number.isFinite(court.latitude) && Number.isFinite(court.longitude)
@@ -22,7 +21,10 @@ export function CourtsMap({ courts }: CourtsMapProps) {
       logoEnabled={false}
       compassEnabled
     >
-      <MapLibreGL.Camera zoomLevel={11.5} centerCoordinate={DC_CENTER} />
+      <MapLibreGL.Camera
+        zoomLevel={11.5}
+        centerCoordinate={[center.lon, center.lat]}
+      />
       {points.map((court) => (
         <MapLibreGL.PointAnnotation
           key={court.id}
