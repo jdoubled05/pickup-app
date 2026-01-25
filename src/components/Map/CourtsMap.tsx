@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View } from "react-native";
+import React, { useEffect, useMemo } from "react";
 import MapLibreGL from "@maplibre/maplibre-react-native";
 import { Court } from "@/src/services/courts";
 
@@ -16,7 +15,6 @@ export function CourtsMap({
   onSelectCourt,
   cameraKey = 0,
 }: CourtsMapProps) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const courtsWithCoords = useMemo(
     () =>
       courts.filter(
@@ -31,17 +29,38 @@ export function CourtsMap({
     [courts]
   );
 
-  const handleSelect = (courtId: string) => {
-    setSelectedId(courtId);
-    onSelectCourt?.(courtId);
-  };
-
   useEffect(() => {
     console.log("[CourtsMap] courts", {
       total: courts.length,
       withCoords: courtsWithCoords.length,
     });
   }, [courts.length, courtsWithCoords.length]);
+
+  const features = useMemo(
+    () =>
+      courtsWithCoords.map((court) => ({
+        type: "Feature",
+        id: court.id,
+        properties: {
+          id: court.id,
+          name: court.name ?? "",
+        },
+        geometry: {
+          type: "Point",
+          coordinates: [court.longitude, court.latitude],
+        },
+      })),
+    [courtsWithCoords]
+  );
+
+  const collection = useMemo(
+    () =>
+      ({
+        type: "FeatureCollection",
+        features,
+      }) as const,
+    [features]
+  );
 
   return (
     <MapLibreGL.MapView
@@ -55,22 +74,27 @@ export function CourtsMap({
         zoomLevel={11.5}
         centerCoordinate={[center.lon, center.lat]}
       />
-      {courtsWithCoords.map((court) => (
-        <MapLibreGL.PointAnnotation
-          key={court.id}
-          id={court.id}
-          coordinate={[court.longitude, court.latitude]}
-          onSelected={() => handleSelect(court.id)}
-        >
-          <View
-            className={
-              selectedId === court.id
-                ? "h-4 w-4 rounded-full border border-white bg-white"
-                : "h-3 w-3 rounded-full bg-[#960000] border border-white"
-            }
-          />
-        </MapLibreGL.PointAnnotation>
-      ))}
+      <MapLibreGL.ShapeSource
+        id="courts"
+        shape={collection}
+        onPress={(e) => {
+          const feat = e?.features?.[0];
+          const courtId = feat?.properties?.id;
+          if (typeof courtId === "string" && courtId.length > 0) {
+            onSelectCourt?.(courtId);
+          }
+        }}
+      >
+        <MapLibreGL.CircleLayer
+          id="courtCircles"
+          style={{
+            circleRadius: 6,
+            circleColor: "#960000",
+            circleStrokeWidth: 2,
+            circleStrokeColor: "#ffffff",
+          }}
+        />
+      </MapLibreGL.ShapeSource>
     </MapLibreGL.MapView>
   );
 }
