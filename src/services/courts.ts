@@ -1,56 +1,90 @@
 import {
-  Court,
-  DbCourt,
   DbCourtNearby,
   mapDbCourtNearbyToCourt,
-  mapDbCourtToCourt,
 } from "@/src/types/db";
 import { getSupabaseEnvStatus, supabase } from "@/src/services/supabase";
+import { Court } from "@/src/types/courts";
 
-export type { Court } from "@/src/types/db";
+export type { Court } from "@/src/types/courts";
 
 export const MOCK_COURTS: Court[] = [
   {
     id: "123",
     name: "Mission Playground",
+    description: "Neighborhood courts with pickup games most evenings.",
+    location: null,
     latitude: 37.7596,
     longitude: -122.4148,
-    address: "2450 Harrison St, San Francisco, CA",
+    address: "2450 Harrison St",
+    city: "San Francisco",
+    state: "CA",
+    postal_code: "94110",
+    country: "US",
+    timezone: "America/Los_Angeles",
     indoor: false,
     surface_type: "asphalt",
     num_hoops: 4,
     lighting: true,
-    open_hours: "6am - 10pm",
-    last_verified_at: "2024-05-10T18:00:00Z",
+    open_24h: false,
+    hours_json: { open: "06:00", close: "22:00" },
+    amenities_json: ["lights", "restrooms"],
+    photos_count: 3,
     created_at: "2024-01-10T18:00:00Z",
+    updated_at: "2024-05-10T18:00:00Z",
+    osm_type: null,
+    osm_id: null,
   },
   {
     id: "456",
     name: "Dolores Park Court",
+    description: "Popular outdoor courts near the park.",
+    location: null,
     latitude: 37.7598,
     longitude: -122.4269,
-    address: "Dolores St & 19th St, San Francisco, CA",
+    address: "Dolores St & 19th St",
+    city: "San Francisco",
+    state: "CA",
+    postal_code: "94114",
+    country: "US",
+    timezone: "America/Los_Angeles",
     indoor: false,
     surface_type: "concrete",
     num_hoops: 2,
     lighting: false,
-    open_hours: "Sunrise - Sunset",
-    last_verified_at: "2024-05-08T17:30:00Z",
+    open_24h: false,
+    hours_json: { open: "sunrise", close: "sunset" },
+    amenities_json: ["water"],
+    photos_count: 2,
     created_at: "2024-01-08T17:30:00Z",
+    updated_at: "2024-05-08T17:30:00Z",
+    osm_type: null,
+    osm_id: null,
   },
   {
     id: "789",
     name: "Panhandle Courts",
+    description: "Larger run with multiple hoops.",
+    location: null,
     latitude: 37.7716,
     longitude: -122.4481,
-    address: "Fell St & Stanyan St, San Francisco, CA",
+    address: "Fell St & Stanyan St",
+    city: "San Francisco",
+    state: "CA",
+    postal_code: "94117",
+    country: "US",
+    timezone: "America/Los_Angeles",
     indoor: false,
     surface_type: "asphalt",
     num_hoops: 6,
     lighting: true,
-    open_hours: "6am - 11pm",
-    last_verified_at: "2024-05-12T16:45:00Z",
+    open_24h: false,
+    hours_json: { open: "06:00", close: "23:00" },
+    amenities_json: ["lights", "parking"],
+    photos_count: 5,
     created_at: "2024-01-12T16:45:00Z",
+    updated_at: "2024-05-12T16:45:00Z",
+    osm_type: null,
+    osm_id: null,
   },
 ];
 
@@ -76,6 +110,7 @@ export async function getCourtById(id: string): Promise<Court | null> {
         return mapDbCourtNearbyToCourt(rpcRow as DbCourtNearby);
       }
     }
+    return fallback;
   } catch (err) {
     if (__DEV__) {
       console.warn("Supabase getCourtById failed:", err);
@@ -128,13 +163,6 @@ export function getMockCourts(): Court[] {
 }
 
 export function formatCourtMeta(court: Court): string {
-  const typeLabel =
-    court.indoor === null || court.indoor === undefined
-      ? "Court"
-      : court.indoor
-      ? "Indoor"
-      : "Outdoor";
-  const hoops = court.num_hoops ?? "?";
   const lighting =
     court.lighting === null || court.lighting === undefined
       ? "Lighting unknown"
@@ -142,22 +170,62 @@ export function formatCourtMeta(court: Court): string {
       ? "Lighting"
       : "No lighting";
 
-  return `${typeLabel} • ${hoops} hoops • ${lighting}`;
+  return `${formatIndoor(court.indoor)} • ${formatHoops(court.num_hoops)} • ${lighting}`;
 }
 
-export function formatLastVerified(court: Court): string | null {
-  if (!court.last_verified_at) {
+export function formatIndoor(indoor: boolean | null): string {
+  if (indoor === null || indoor === undefined) {
+    return "Indoor/Outdoor unknown";
+  }
+  return indoor ? "Indoor" : "Outdoor";
+}
+
+export function formatHoops(num_hoops: number | null): string {
+  if (num_hoops === null || num_hoops === undefined) {
+    return "Hoops unknown";
+  }
+  return `${num_hoops} hoops`;
+}
+
+export function formatDistance(distance_meters?: number): string | null {
+  if (distance_meters === null || distance_meters === undefined) {
     return null;
   }
-
-  const date = new Date(court.last_verified_at);
-  if (Number.isNaN(date.getTime())) {
+  const miles = distance_meters / 1609.34;
+  if (!Number.isFinite(miles)) {
     return null;
   }
+  if (miles < 0.1) {
+    return "<0.1 mi";
+  }
+  return `${miles.toFixed(1)} mi`;
+}
 
-  return date.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+export function formatAddress(court: Court): string {
+  const parts = [
+    court.address,
+    court.city,
+    court.state,
+    court.postal_code,
+  ].filter(Boolean);
+
+  if (parts.length === 0) {
+    return "Address unknown";
+  }
+
+  return parts.join(", ");
+}
+
+export function formatHours(hours_json: unknown | null): string {
+  if (!hours_json) {
+    return "Not provided";
+  }
+  if (typeof hours_json === "string") {
+    return hours_json;
+  }
+  try {
+    return JSON.stringify(hours_json);
+  } catch {
+    return "Not provided";
+  }
 }
