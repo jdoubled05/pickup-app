@@ -16,7 +16,7 @@ export default function Welcome() {
           <Button title="Browse Courts" />
         </Link>
 
-        <Link href="/courts/123" asChild>
+        <Link href="/court/123" asChild>
           <Button title="Go to Court Details (id=123)" className="mt-3" />
         </Link>
 
