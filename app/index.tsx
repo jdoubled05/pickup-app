@@ -20,9 +20,9 @@ export default function Home() {
           <Button title="Go to Court Details (id=123)" className="mt-3" />
         </Link>
 
-        <Link href="/maps-test" asChild>
+        <Link href="/map" asChild>
           <Button
-            title="Open Maps Test"
+            title="Open Map"
             variant="secondary"
             className="mt-3"
           />
