@@ -1,6 +1,8 @@
 import "react-native-reanimated";
 import "../global.css";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
+import { Pressable } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { AppShell } from "@/src/components/AppShell";
 
 export const unstable_settings = {
@@ -8,6 +10,8 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
+  const router = useRouter();
+
   return (
     <AppShell>
       <Stack
@@ -28,6 +32,21 @@ export default function RootLayout() {
             headerBackButtonDisplayMode: "minimal",
             headerBackTitleVisible: false,
             headerBackTitle: "",
+            headerLeft: () => (
+              <Pressable
+                onPress={() => {
+                  if (router.canGoBack()) {
+                    router.back();
+                  } else {
+                    router.replace("/courts");
+                  }
+                }}
+                hitSlop={8}
+                style={{ paddingHorizontal: 6, paddingVertical: 2 }}
+              >
+                <Ionicons name="chevron-back" size={22} color="#fff" />
+              </Pressable>
+            ),
           }}
         />
       </Stack>
