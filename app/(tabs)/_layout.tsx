@@ -8,18 +8,19 @@ export default function TabLayout() {
       initialRouteName="courts"
       screenOptions={{
         headerShown: false,
+        unmountOnBlur: false,
         tabBarStyle: {
           backgroundColor: "#000",
           borderTopColor: "rgba(255,255,255,0.15)",
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 70 : 60,
-          paddingBottom: Platform.OS === "ios" ? 10 : 8,
+          height: Platform.OS === "ios" ? 64 : 56,
+          paddingBottom: Platform.OS === "ios" ? 6 : 4,
         },
         tabBarActiveTintColor: "#fff",
         tabBarInactiveTintColor: "rgba(255,255,255,0.55)",
         tabBarLabelStyle: {
-          fontSize: 11,
-          marginBottom: 2,
+          fontSize: 10,
+          marginBottom: 1,
         },
       }}
     >
