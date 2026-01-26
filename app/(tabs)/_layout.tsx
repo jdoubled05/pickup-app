@@ -5,7 +5,7 @@ import { Platform } from "react-native";
 export default function TabLayout() {
   return (
     <Tabs
-      initialRouteName="map"
+      initialRouteName="courts"
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
