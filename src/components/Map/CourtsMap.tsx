@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import MapLibreGL from "@maplibre/maplibre-react-native";
 import { Court } from "@/src/services/courts";
 
@@ -9,17 +9,28 @@ type CourtsMapProps = {
   onSelectCourt?: (courtId: string) => void;
 };
 
+type CameraState = {
+  center: [number, number];
+  zoom: number;
+};
+
+let cachedCamera: CameraState | null = null;
+
 export function CourtsMap({
   center,
   courts,
   recenterSignal,
   onSelectCourt,
 }: CourtsMapProps) {
-  const [cameraCenter, setCameraCenter] = useState<[number, number]>([
-    center.lon,
-    center.lat,
-  ]);
-  const [zoom, setZoom] = useState(11.5);
+  const initialCamera = cachedCamera ?? {
+    center: [center.lon, center.lat] as [number, number],
+    zoom: 11.5,
+  };
+  const [cameraCenter, setCameraCenter] = useState<[number, number]>(
+    initialCamera.center
+  );
+  const [zoom, setZoom] = useState(initialCamera.zoom);
+  const lastCameraUpdateRef = useRef(0);
   const courtsWithCoords = useMemo(
     () =>
       courts.filter(
@@ -54,6 +65,29 @@ export function CourtsMap({
     }
   }, [recenterSignal, center.lat, center.lon]);
 
+  const handleCameraChanged = useCallback((e: unknown) => {
+    const now = Date.now();
+    if (now - lastCameraUpdateRef.current < 250) {
+      return;
+    }
+    lastCameraUpdateRef.current = now;
+    const payload = (e as { properties?: unknown })?.properties ?? e;
+    const centerValue = (payload as { center?: [number, number] })?.center;
+    const zoomValue = (payload as { zoom?: number })?.zoom;
+    if (
+      Array.isArray(centerValue) &&
+      centerValue.length === 2 &&
+      typeof centerValue[0] === "number" &&
+      typeof centerValue[1] === "number" &&
+      Number.isFinite(centerValue[0]) &&
+      Number.isFinite(centerValue[1]) &&
+      typeof zoomValue === "number" &&
+      Number.isFinite(zoomValue)
+    ) {
+      cachedCamera = { center: centerValue, zoom: zoomValue };
+    }
+  }, []);
+
   const features = useMemo(
     () =>
       courtsWithCoords.map((court) => ({
@@ -86,6 +120,7 @@ export function CourtsMap({
       styleURL={MapLibreGL.StyleURL.Street}
       logoEnabled={false}
       compassEnabled
+      onCameraChanged={handleCameraChanged}
     >
       <MapLibreGL.Camera
         zoomLevel={zoom}

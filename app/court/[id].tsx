@@ -6,6 +6,12 @@ import { Button } from "@/src/components/ui/Button";
 import { Section } from "@/src/components/ui/Section";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import {
+  isCourtSaved,
+  hydrateSavedCourts,
+  subscribeSavedCourts,
+  toggleSavedCourt,
+} from "@/src/services/savedCourts";
+import {
   Court,
   formatAddress,
   formatHours,
@@ -21,6 +27,7 @@ export default function CourtDetails() {
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
   const supabaseStatus = getSupabaseEnvStatus();
 
   const loadCourt = useCallback(async () => {
@@ -45,6 +52,16 @@ export default function CourtDetails() {
   useEffect(() => {
     loadCourt();
   }, [loadCourt]);
+
+  useEffect(() => {
+    if (!courtId) {
+      return;
+    }
+    hydrateSavedCourts().then((ids) => {
+      setSaved(ids.includes(courtId));
+    });
+    return subscribeSavedCourts((ids) => setSaved(ids.includes(courtId)));
+  }, [courtId]);
 
   return (
     <View className="flex-1 bg-black px-6 py-6">
@@ -88,7 +105,16 @@ export default function CourtDetails() {
           <Text className="mt-3 text-white/60">{formatCourtMeta(court)}</Text>
 
           <View className="mt-5">
-            <Button title="Refresh" onPress={loadCourt} variant="secondary" />
+            <View className="flex-row gap-3">
+              <Button title="Refresh" onPress={loadCourt} variant="secondary" />
+              <Button
+                title={saved ? "Saved" : "Save"}
+                onPress={() => {
+                  toggleSavedCourt(court.id);
+                }}
+                variant={saved ? "secondary" : "primary"}
+              />
+            </View>
           </View>
 
           <Section title="Details">
