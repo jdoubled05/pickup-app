@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, PressableProps } from "react-native";
+import { Pressable, PressableProps, View } from "react-native";
 import { Text } from "./Text";
 import { cn } from "@/src/lib/cn";
 
@@ -8,12 +8,14 @@ type Variant = "primary" | "secondary" | "ghost";
 export function Button({
   title,
   variant = "primary",
+  icon,
   className,
   textClassName,
   ...props
 }: PressableProps & {
   title: string;
   variant?: Variant;
+  icon?: React.ReactNode;
   className?: string;
   textClassName?: string;
 }) {
@@ -22,16 +24,19 @@ export function Button({
     variant === "primary"
       ? "bg-[#960000]"
       : variant === "secondary"
-      ? "bg-white/10"
+      ? "bg-gray-200 dark:bg-white/10 border border-gray-300 dark:border-white/20"
       : "bg-transparent";
 
   const textBase = "text-base font-semibold";
   const textVariant =
-    variant === "primary" ? "text-white" : variant === "secondary" ? "text-white" : "text-white/80";
+    variant === "primary" ? "text-white" : variant === "secondary" ? "text-gray-900 dark:text-white" : "text-gray-900 dark:text-white/80";
 
   return (
     <Pressable className={cn(base, variantClass, className)} {...props}>
-      <Text className={cn(textBase, textVariant, textClassName)}>{title}</Text>
+      <View className="flex-row items-center justify-center">
+        {icon && <View className="mr-2">{icon}</View>}
+        <Text className={cn(textBase, textVariant, textClassName)}>{title}</Text>
+      </View>
     </Pressable>
   );
 }

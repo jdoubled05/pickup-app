@@ -33,6 +33,8 @@ yarn-error.*
 # local env files
 .env*.local
 .env
+.env.dev
+.env.prod
 
 # typescript
 *.tsbuildinfo
@@ -42,6 +44,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# privacy site (separate repo)
+privacy-site/
 
 # macOS
 .DS_Store

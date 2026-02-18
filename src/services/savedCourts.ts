@@ -58,7 +58,9 @@ export const removeSavedCourt = async (id: string) => {
 export const subscribeSavedCourts = (listener: SavedCourtsListener) => {
   listeners.add(listener);
   listener([...savedIds]);
-  return () => listeners.delete(listener);
+  return () => {
+    listeners.delete(listener);
+  };
 };
 
 export const hydrateSavedCourts = async () => {

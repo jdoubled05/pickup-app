@@ -1,9 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { View } from "react-native";
-import { Link, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useState, useRef } from "react";
+import { View, Pressable, ScrollView, Animated, useColorScheme } from "react-native";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import * as Haptics from "expo-haptics";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
-import { Section } from "@/src/components/ui/Section";
+import { PhotoGallery } from "@/src/components/PhotoGallery";
+import { PhotoUpload } from "@/src/components/PhotoUpload";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import {
   isCourtSaved,
@@ -15,20 +18,33 @@ import {
   Court,
   formatAddress,
   formatHours,
-  formatHoops,
-  formatIndoor,
-  formatCourtMeta,
   getCourtById,
 } from "@/src/services/courts";
+import { openDirections } from "@/src/utils/directions";
+import {
+  toggleCheckIn,
+  isCheckedInAtCourt,
+  subscribeToCheckIns,
+} from "@/src/services/checkins";
 
 export default function CourtDetails() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
+  const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
   const courtId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [court, setCourt] = useState<Court | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [checkInsCount, setCheckInsCount] = useState(0);
+  const [isUserCheckedIn, setIsUserCheckedIn] = useState(false);
+  const [checkInLoading, setCheckInLoading] = useState(false);
+  const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
   const supabaseStatus = getSupabaseEnvStatus();
+
+  // Pulsing animation for live indicator
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const loadCourt = useCallback(async () => {
     if (!courtId) {
@@ -49,6 +65,55 @@ export default function CourtDetails() {
     }
   }, [courtId]);
 
+  const handleGetDirections = useCallback(() => {
+    if (!court) return;
+    const { latitude, longitude, name } = court;
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude)
+    ) {
+      return;
+    }
+    openDirections(latitude, longitude, name);
+  }, [court]);
+
+  const handleToggleCheckIn = useCallback(async () => {
+    if (!courtId || checkInLoading) return;
+
+    // Haptic feedback on press
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    setCheckInLoading(true);
+
+    // Optimistic UI update
+    const previousState = isUserCheckedIn;
+    const previousCount = checkInsCount;
+    setIsUserCheckedIn(!isUserCheckedIn);
+    setCheckInsCount(isUserCheckedIn ? checkInsCount - 1 : checkInsCount + 1);
+
+    try {
+      const success = await toggleCheckIn(courtId);
+
+      if (!success) {
+        // Revert on failure
+        setIsUserCheckedIn(previousState);
+        setCheckInsCount(previousCount);
+      } else {
+        // Success haptic
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch (err) {
+      // Revert on error
+      setIsUserCheckedIn(previousState);
+      setCheckInsCount(previousCount);
+      console.error("Failed to toggle check-in:", err);
+    } finally {
+      setCheckInLoading(false);
+    }
+  }, [courtId, isUserCheckedIn, checkInsCount, checkInLoading]);
+
   useEffect(() => {
     loadCourt();
   }, [loadCourt]);
@@ -63,15 +128,51 @@ export default function CourtDetails() {
     return subscribeSavedCourts((ids) => setSaved(ids.includes(courtId)));
   }, [courtId]);
 
+  // Subscribe to check-ins real-time updates
+  useEffect(() => {
+    if (!courtId || !supabaseStatus.configured) {
+      return;
+    }
+
+    // Load initial check-in status
+    isCheckedInAtCourt(courtId).then(setIsUserCheckedIn);
+
+    // Subscribe to check-ins count changes
+    const unsubscribe = subscribeToCheckIns(courtId, setCheckInsCount);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [courtId, supabaseStatus.configured]);
+
+  // Pulsing animation for live activity indicator
+  useEffect(() => {
+    if (checkInsCount > 0) {
+      const pulse = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.3,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      pulse.start();
+      return () => pulse.stop();
+    }
+  }, [checkInsCount, pulseAnim]);
+
   return (
-    <View className="flex-1 bg-black px-6 py-6">
+    <ScrollView className="flex-1 bg-white dark:bg-black">
       {!courtId ? (
-        <View>
-          <Text className="text-2xl font-bold">Court Details</Text>
-          <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Live data" : "Mock data"}
-          </Text>
-          <Text className="mt-2 text-white/70">Court not found.</Text>
+        <View className="px-6 py-6">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">Court Details</Text>
+          <Text className="mt-2 text-gray-600 dark:text-white/70">Court not found.</Text>
           <View className="mt-6">
             <Link href="/courts" asChild>
               <Button title="Back to Courts" variant="secondary" />
@@ -79,93 +180,267 @@ export default function CourtDetails() {
           </View>
         </View>
       ) : loading ? (
-        <View>
-          <Text className="text-2xl font-bold text-white/40">Loading court...</Text>
-          <Text className="mt-3 text-white/20">Loading address...</Text>
-          <Text className="mt-2 text-white/20">Loading details...</Text>
+        <View className="px-6 py-6">
+          <View className="h-6 w-48 rounded-lg bg-gray-200 dark:bg-white/10" />
+          <View className="mt-3 h-4 w-64 rounded-lg bg-gray-100 dark:bg-white/5" />
+          <View className="mt-6 h-32 rounded-2xl bg-gray-100 dark:bg-white/5" />
         </View>
       ) : error ? (
-        <View>
-          <Text className="text-2xl font-bold">Court Details</Text>
-          <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Live data" : "Mock data"}
-          </Text>
-          <Text className="mt-2 text-white/70">Error: {error}</Text>
+        <View className="px-6 py-6">
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">Court Details</Text>
+          <Text className="mt-2 text-gray-600 dark:text-white/70">Error: {error}</Text>
           <View className="mt-6">
             <Button title="Retry" onPress={loadCourt} variant="secondary" />
           </View>
         </View>
       ) : court ? (
-        <View>
-          <Text className="text-3xl font-bold">{court.name}</Text>
-          <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Live data" : "Mock data"}
-          </Text>
-          <Text className="mt-2 text-white/70">{formatAddress(court)}</Text>
-          <Text className="mt-3 text-white/60">{formatCourtMeta(court)}</Text>
+        <View className="flex-1">
+          {/* Hero Header */}
+          <View className="px-6 pb-4 pt-6">
+            <View className="mb-2 flex-row items-center justify-between">
+              <Pressable
+                onPress={() => router.back()}
+                className="h-11 w-11 items-center justify-center rounded-full bg-gray-200 dark:bg-white/10"
+                accessibilityLabel="Go back"
+                accessibilityRole="button"
+              >
+                <Text className="text-xl text-gray-900 dark:text-white">←</Text>
+              </Pressable>
+              {saved && (
+                <View className="rounded-full bg-vibrant-gold/20 px-3 py-1">
+                  <Text className="text-xs font-semibold text-vibrant-gold">⭐ Saved</Text>
+                </View>
+              )}
+            </View>
 
-          <View className="mt-5">
-            <View className="flex-row gap-3">
-              <Button title="Refresh" onPress={loadCourt} variant="secondary" />
-              <Button
-                title={saved ? "Saved" : "Save"}
-                onPress={() => {
-                  toggleSavedCourt(court.id);
-                }}
-                variant={saved ? "secondary" : "primary"}
-              />
+            <Text className="text-3xl font-extrabold text-gray-900 dark:text-white">{court.name}</Text>
+            <View className="mt-2 h-1 w-20 rounded-full bg-brand" />
+
+            {court.address && (
+              <Text className="mt-3 text-base text-gray-500 dark:text-white/60">
+                📍 {formatAddress(court)}
+              </Text>
+            )}
+
+            {/* Court Type & Hoops */}
+            <View className="mt-4 flex-row flex-wrap">
+              <View
+                className={`mr-2 mb-2 rounded-xl px-4 py-2 ${
+                  court.indoor ? 'bg-secondary' : 'bg-court'
+                }`}
+              >
+                <Text className="font-semibold text-white">
+                  {court.indoor ? '🏠 Indoor' : '🌤️ Outdoor'}
+                </Text>
+              </View>
+
+              {court.num_hoops != null && (
+                <View className="mr-2 mb-2 rounded-xl bg-gray-200 dark:bg-white/10 px-4 py-2">
+                  <Text className="font-semibold text-gray-900 dark:text-white">
+                    🏀 {court.num_hoops} {court.num_hoops === 1 ? 'Hoop' : 'Hoops'}
+                  </Text>
+                </View>
+              )}
+
+              {court.lighting != null && (
+                <View className="mb-2 rounded-xl bg-gray-200 dark:bg-white/10 px-4 py-2">
+                  <Text className="font-semibold text-gray-900 dark:text-white">
+                    {court.lighting ? '💡 Lit' : '🌙 No Lights'}
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
-          <Section title="Details">
-            <Text className="mt-2 text-white/70">
-              {formatIndoor(court.indoor)}
-            </Text>
-            <Text className="mt-2 text-white/70">
-              Surface: {court.surface_type ?? "Unknown"}
-            </Text>
-            <Text className="mt-2 text-white/70">
-              {formatHoops(court.num_hoops)}
-            </Text>
-            <Text className="mt-2 text-white/70">
-              Lighting:{" "}
-              {court.lighting === null || court.lighting === undefined
-                ? "Unknown"
-                : court.lighting
-                ? "Yes"
-                : "No"}
-            </Text>
-          </Section>
+          {/* Live Activity Banner */}
+          {supabaseStatus.configured && (
+            <View className="mx-6 mt-4 overflow-hidden rounded-2xl border border-brand/30 bg-brand/10">
+              <View className="flex-row items-center px-4 py-4">
+                <View className="mr-4 h-12 w-12 items-center justify-center rounded-full bg-brand/30">
+                  <Text className="text-2xl">
+                    {checkInsCount === 0 ? '🏀' : '🔥'}
+                  </Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-lg font-bold text-gray-900 dark:text-white">
+                    {checkInsCount === 0
+                      ? 'No one here yet'
+                      : checkInsCount === 1
+                        ? '1 person here now'
+                        : `${checkInsCount} people here now`}
+                  </Text>
+                  <Text className="mt-0.5 text-sm text-gray-600 dark:text-white/60">
+                    {checkInsCount === 0
+                      ? 'Be the first to check in!'
+                      : 'Game on! 🏀'}
+                  </Text>
+                </View>
+                {checkInsCount > 0 && (
+                  <Animated.View
+                    className="ml-2 h-3 w-3 rounded-full bg-status-active"
+                    style={{ opacity: pulseAnim }}
+                  />
+                )}
+              </View>
+            </View>
+          )}
 
-          <Section title="Hours">
-            <Text className="text-white/70">
-              {court.open_24h ? "Open 24 hours" : formatHours(court.hours_json)}
-            </Text>
-          </Section>
+          {/* Action Buttons */}
+          <View className="mt-6 px-6">
+            {supabaseStatus.configured && (
+              <Pressable
+                onPress={handleToggleCheckIn}
+                disabled={checkInLoading}
+                className={`mb-3 rounded-2xl py-4 ${
+                  isUserCheckedIn
+                    ? 'bg-court'
+                    : 'bg-brand'
+                } ${checkInLoading ? 'opacity-50' : ''}`}
+                accessibilityLabel={isUserCheckedIn ? 'Check out from this court' : 'Check in at this court'}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: checkInLoading }}
+              >
+                <View className="flex-row items-center justify-center">
+                  {!checkInLoading && (
+                    <View className="mr-2">
+                      <Ionicons
+                        name={isUserCheckedIn ? 'checkmark-circle' : 'basketball'}
+                        size={24}
+                        color="#ffffff"
+                      />
+                    </View>
+                  )}
+                  <Text className="text-center text-lg font-bold text-white">
+                    {checkInLoading
+                      ? 'Loading...'
+                      : isUserCheckedIn
+                        ? 'Checked In'
+                        : "I'm Here"}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
 
-          <Section title="Location">
-            <Text className="text-white/70">
-              {court.city || court.state || court.postal_code
-                ? [court.city, court.state, court.postal_code].filter(Boolean).join(", ")
-                : "Not provided"}
-            </Text>
-          </Section>
+            <View className="flex-row">
+              <Pressable
+                onPress={handleGetDirections}
+                className="mr-3 flex-1 items-center rounded-2xl border border-gray-300 dark:border-white/20 bg-gray-200 dark:bg-white/10 py-3"
+                accessibilityLabel={`Get directions to ${court.name}`}
+                accessibilityRole="button"
+              >
+                <Ionicons name="navigate-outline" size={24} color={isDark ? "#ffffff" : "#000000"} />
+                <Text className="mt-1 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                  Directions
+                </Text>
+              </Pressable>
 
-          <Section title="Coordinates">
-            <Text className="text-white/70">
-              {Number.isFinite(court.latitude) && Number.isFinite(court.longitude)
-                ? `${court.latitude}, ${court.longitude}`
-                : "Unknown"}
-            </Text>
-          </Section>
+              <Pressable
+                onPress={async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  toggleSavedCourt(court.id);
+                }}
+                className={`flex-1 items-center rounded-2xl py-3 ${
+                  saved
+                    ? 'border border-vibrant-gold/30 bg-vibrant-gold/20'
+                    : 'border border-gray-300 dark:border-white/20 bg-gray-200 dark:bg-white/10'
+                }`}
+                accessibilityLabel={saved ? `Remove ${court.name} from saved courts` : `Save ${court.name} to favorites`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: saved }}
+              >
+                <Ionicons
+                  name={saved ? "bookmark" : "bookmark-outline"}
+                  size={24}
+                  color={saved ? "#FFD700" : (isDark ? "#ffffff" : "#000000")}
+                />
+                <Text
+                  className={`mt-1 text-center text-sm font-semibold ${
+                    saved ? 'text-vibrant-gold' : 'text-gray-900 dark:text-white'
+                  }`}
+                >
+                  {saved ? 'Saved' : 'Save'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Photo Gallery */}
+          {supabaseStatus.configured && courtId && (
+            <View className="mt-6">
+              <PhotoGallery
+                key={photoRefreshKey}
+                courtId={courtId}
+                onPhotoDeleted={() => setPhotoRefreshKey(prev => prev + 1)}
+              />
+            </View>
+          )}
+
+          {/* Photo Upload */}
+          {supabaseStatus.configured && courtId && (
+            <View className="mt-6 px-6">
+              <PhotoUpload
+                courtId={courtId}
+                onUploadSuccess={() => {
+                  // Trigger photo gallery refresh
+                  setPhotoRefreshKey(prev => prev + 1);
+                }}
+              />
+            </View>
+          )}
+
+          {/* Additional Details */}
+          <View className="mt-6 px-6 pb-8">
+            <Text className="mb-3 text-lg font-bold text-gray-900 dark:text-white">Details</Text>
+
+            {court.surface_type && (
+              <View className="mb-3 flex-row items-center rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+                <View className="mr-3">
+                  <Ionicons name="basketball" size={24} color={isDark ? '#ffffff' : '#1f2937'} />
+                </View>
+                <View>
+                  <Text className="text-xs text-gray-400 dark:text-white/50">Surface</Text>
+                  <Text className="mt-0.5 font-medium text-gray-900 dark:text-white">
+                    {court.surface_type}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {court.open_24h != null && (
+              <View className="mb-3 flex-row items-center rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+                <View className="mr-3">
+                  <Ionicons name="time-outline" size={24} color={isDark ? '#ffffff' : '#1f2937'} />
+                </View>
+                <View>
+                  <Text className="text-xs text-gray-400 dark:text-white/50">Hours</Text>
+                  <Text className="mt-0.5 font-medium text-gray-900 dark:text-white">
+                    {court.open_24h ? 'Open 24 hours' : formatHours(court.hours_json)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {(court.city || court.state) && (
+              <View className="mb-3 flex-row items-center rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+                <View className="mr-3">
+                  <Ionicons name="location" size={24} color={isDark ? '#ffffff' : '#1f2937'} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-xs text-gray-400 dark:text-white/50">Location</Text>
+                  <Text className="mt-0.5 font-medium text-gray-900 dark:text-white" numberOfLines={2}>
+                    {[court.city, court.state, court.postal_code]
+                      .filter(Boolean)
+                      .join(', ')}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
         </View>
       ) : (
         <View>
-          <Text className="text-2xl font-bold">Court Details</Text>
-          <Text className="mt-1 text-white/50">
-            {supabaseStatus.configured ? "Live data" : "Mock data"}
-          </Text>
-          <Text className="mt-2 text-white/70">Court not found.</Text>
+          <Text className="text-2xl font-bold text-gray-900 dark:text-white">Court Details</Text>
+          <Text className="mt-2 text-gray-600 dark:text-white/70">Court not found.</Text>
           <View className="mt-6">
             <Link href="/courts" asChild>
               <Button title="Back to Courts" variant="secondary" />
@@ -173,6 +448,6 @@ export default function CourtDetails() {
           </View>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }

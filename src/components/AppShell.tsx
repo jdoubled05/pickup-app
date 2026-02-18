@@ -1,11 +1,14 @@
 import React from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, useColorScheme } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#000' : '#fff' }]}>
         <View style={styles.container}>{children}</View>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -15,7 +18,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#000",
   },
   container: {
     flex: 1,

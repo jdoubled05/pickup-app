@@ -17,7 +17,8 @@ create table if not exists public.courts (
   geom geography(Point, 4326)
 );
 
-create index if not exists courts_geom_gist on public.courts using gist (geom);
+-- Note: Spatial index creation moved to migration 002 which uses updated 'location' column
+-- create index if not exists courts_geom_gist on public.courts using gist (geom);
 create index if not exists courts_name_idx on public.courts (name);
 
 alter table public.courts enable row level security;
