@@ -11,13 +11,13 @@ export default function TabLayout() {
       initialRouteName="courts"
       screenOptions={{
         headerShown: false,
-        unmountOnBlur: false,
         tabBarStyle: {
           backgroundColor: isDark ? "#000" : "#fff",
           borderTopColor: isDark ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.15)",
           borderTopWidth: 1,
-          height: Platform.OS === "ios" ? 64 : 56,
-          paddingBottom: Platform.OS === "ios" ? 6 : 4,
+          height: Platform.OS === "ios" ? 82 : 72,
+          paddingTop: Platform.OS === "ios" ? 8 : 6,
+          paddingBottom: Platform.OS === "ios" ? 12 : 10,
         },
         tabBarActiveTintColor: isDark ? "#fff" : "#960000",
         tabBarInactiveTintColor: isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.45)",

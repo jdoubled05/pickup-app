@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Switch, useColorScheme } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import Constants from "expo-constants";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -18,7 +19,8 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabledState] = React.useState(false);
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const iconColor = isDark ? '#ffffff' : '#1f2937'; // white in dark mode, gray-800 in light mode
+  const iconColor = isDark ? '#ffffff' : '#1f2937';
+  const insets = useSafeAreaInsets(); // white in dark mode, gray-800 in light mode
   const version =
     Constants.expoConfig?.version ??
     Constants.manifest?.version ??
@@ -57,7 +59,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View className="flex-1 bg-white dark:bg-black px-6 py-6">
+    <View className="flex-1 bg-white dark:bg-black px-6 pb-6" style={{ paddingTop: insets.top + 24 }}>
       <Text className="text-2xl font-bold text-gray-900 dark:text-white">Profile</Text>
       <Text className="mt-2 text-gray-600 dark:text-white/70">
         Profile features will be added soon.

@@ -170,6 +170,26 @@ export function HotCourtCard({ court, checkInsCount, index, weather }: HotCourtC
             </View>
           </View>
 
+          {/* Free/Paid + Public/Private badges */}
+          {(court.is_free != null || court.is_public != null) && (
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              {court.is_free != null && (
+                <View className="rounded-lg bg-white/10 px-3 py-1.5">
+                  <Text className="text-xs font-medium text-white/70">
+                    {court.is_free ? 'Free' : 'Paid'}
+                  </Text>
+                </View>
+              )}
+              {court.is_public != null && (
+                <View className="rounded-lg bg-white/10 px-3 py-1.5">
+                  <Text className="text-xs font-medium text-white/70">
+                    {court.is_public ? 'Public' : 'Private'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Join Game Button */}
           <Pressable
             onPress={handleJoinGame}

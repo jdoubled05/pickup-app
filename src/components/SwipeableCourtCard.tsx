@@ -1,6 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Pressable, Animated } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
+
+// Track the currently open swipeable so we can close it when another opens
+let currentlyOpenSwipeable: Swipeable | null = null;
+
+export function closeCurrentSwipeable() {
+  currentlyOpenSwipeable?.close();
+  currentlyOpenSwipeable = null;
+}
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { Text } from './ui/Text';
@@ -33,6 +41,7 @@ export function SwipeableCourtCard({
 }: SwipeableCourtCardProps) {
   const swipeableRef = useRef<Swipeable>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   // Track saved state
   useEffect(() => {
@@ -70,25 +79,40 @@ export function SwipeableCourtCard({
     swipeableRef.current?.close();
   };
 
+  const handleSwipeableOpen = () => {
+    if (currentlyOpenSwipeable && currentlyOpenSwipeable !== swipeableRef.current) {
+      currentlyOpenSwipeable.close();
+    }
+    currentlyOpenSwipeable = swipeableRef.current;
+    setIsOpen(true);
+  };
+
+  const handleSwipeableClose = () => {
+    if (currentlyOpenSwipeable === swipeableRef.current) {
+      currentlyOpenSwipeable = null;
+    }
+    setIsOpen(false);
+  };
+
   const renderLeftActions = (
-    progress: Animated.AnimatedInterpolation<number>,
+    _progress: Animated.AnimatedInterpolation<number>,
     dragX: Animated.AnimatedInterpolation<number>
   ) => {
     const opacity = dragX.interpolate({
-      inputRange: [0, 100],
-      outputRange: [0.5, 1],
+      inputRange: [0, 80],
+      outputRange: [0, 1],
       extrapolate: 'clamp',
     });
 
     return (
       <Pressable
         onPress={handleDirections}
-        style={{ justifyContent: 'center', alignItems: 'center' }}
-        className="px-8 bg-gray-300 dark:bg-black/40"
+        style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' }}
+        className="px-8"
       >
         <Animated.View style={{ opacity, alignItems: 'center' }}>
-          <Ionicons name="navigate-outline" size={32} color="#ffffff" />
-          <Text className="mt-2 text-xs font-semibold text-gray-900 dark:text-white">
+          <Ionicons name="navigate-outline" size={28} color="#960000" />
+          <Text className="mt-1 text-xs font-semibold text-gray-700 dark:text-white/70">
             Directions
           </Text>
         </Animated.View>
@@ -97,28 +121,28 @@ export function SwipeableCourtCard({
   };
 
   const renderRightActions = (
-    progress: Animated.AnimatedInterpolation<number>,
+    _progress: Animated.AnimatedInterpolation<number>,
     dragX: Animated.AnimatedInterpolation<number>
   ) => {
     const opacity = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0.5],
+      inputRange: [-80, 0],
+      outputRange: [1, 0],
       extrapolate: 'clamp',
     });
 
     return (
       <Pressable
         onPress={handleSave}
-        style={{ justifyContent: 'center', alignItems: 'center' }}
-        className="px-8 bg-gray-300 dark:bg-black/40"
+        style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' }}
+        className="px-8"
       >
         <Animated.View style={{ opacity, alignItems: 'center' }}>
           <Ionicons
             name={isSaved ? "bookmark" : "bookmark-outline"}
-            size={32}
-            color="#ffffff"
+            size={28}
+            color={isSaved ? "#FFD700" : "#960000"}
           />
-          <Text className="mt-2 text-xs font-semibold text-gray-900 dark:text-white">
+          <Text className="mt-1 text-xs font-semibold text-gray-700 dark:text-white/70">
             {isSaved ? 'Saved' : 'Save'}
           </Text>
         </Animated.View>
@@ -135,17 +159,27 @@ export function SwipeableCourtCard({
       rightThreshold={80}
       overshootLeft={false}
       overshootRight={false}
+      onSwipeableWillOpen={handleSwipeableOpen}
+      onSwipeableClose={handleSwipeableClose}
     >
-      {isHot ? (
-        <HotCourtCard
-          court={court}
-          checkInsCount={checkInsCount}
-          index={index}
-          weather={weather}
-        />
-      ) : (
-        <CourtCard court={court} index={index} weather={weather} />
-      )}
+      <View style={{ position: 'relative' }}>
+        {isHot ? (
+          <HotCourtCard
+            court={court}
+            checkInsCount={checkInsCount}
+            index={index}
+            weather={weather}
+          />
+        ) : (
+          <CourtCard court={court} index={index} weather={weather} />
+        )}
+        {isOpen && (
+          <Pressable
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            onPress={() => swipeableRef.current?.close()}
+          />
+        )}
+      </View>
     </Swipeable>
   );
 }

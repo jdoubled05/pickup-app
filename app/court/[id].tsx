@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { View, Pressable, ScrollView, Animated, useColorScheme } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
@@ -26,6 +27,7 @@ import {
   isCheckedInAtCourt,
   subscribeToCheckIns,
 } from "@/src/services/checkins";
+import { ReportModal } from "@/src/components/ReportModal";
 
 export default function CourtDetails() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -41,6 +43,8 @@ export default function CourtDetails() {
   const [isUserCheckedIn, setIsUserCheckedIn] = useState(false);
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const insets = useSafeAreaInsets();
   const supabaseStatus = getSupabaseEnvStatus();
 
   // Pulsing animation for live indicator
@@ -168,6 +172,7 @@ export default function CourtDetails() {
   }, [checkInsCount, pulseAnim]);
 
   return (
+    <>
     <ScrollView className="flex-1 bg-white dark:bg-black">
       {!courtId ? (
         <View className="px-6 py-6">
@@ -196,7 +201,7 @@ export default function CourtDetails() {
       ) : court ? (
         <View className="flex-1">
           {/* Hero Header */}
-          <View className="px-6 pb-4 pt-6">
+          <View className="px-6 pb-4" style={{ paddingTop: insets.top + 4 }}>
             <View className="mb-2 flex-row items-center justify-between">
               <Pressable
                 onPress={() => router.back()}
@@ -324,11 +329,11 @@ export default function CourtDetails() {
             <View className="flex-row">
               <Pressable
                 onPress={handleGetDirections}
-                className="mr-3 flex-1 items-center rounded-2xl border border-gray-300 dark:border-white/20 bg-gray-200 dark:bg-white/10 py-3"
+                className="mr-3 flex-1 items-center py-3"
                 accessibilityLabel={`Get directions to ${court.name}`}
                 accessibilityRole="button"
               >
-                <Ionicons name="navigate-outline" size={24} color={isDark ? "#ffffff" : "#000000"} />
+                <Ionicons name="navigate-outline" size={26} color="#960000" />
                 <Text className="mt-1 text-center text-sm font-semibold text-gray-900 dark:text-white">
                   Directions
                 </Text>
@@ -339,19 +344,15 @@ export default function CourtDetails() {
                   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   toggleSavedCourt(court.id);
                 }}
-                className={`flex-1 items-center rounded-2xl py-3 ${
-                  saved
-                    ? 'border border-vibrant-gold/30 bg-vibrant-gold/20'
-                    : 'border border-gray-300 dark:border-white/20 bg-gray-200 dark:bg-white/10'
-                }`}
+                className="flex-1 items-center py-3"
                 accessibilityLabel={saved ? `Remove ${court.name} from saved courts` : `Save ${court.name} to favorites`}
                 accessibilityRole="button"
                 accessibilityState={{ selected: saved }}
               >
                 <Ionicons
                   name={saved ? "bookmark" : "bookmark-outline"}
-                  size={24}
-                  color={saved ? "#FFD700" : (isDark ? "#ffffff" : "#000000")}
+                  size={26}
+                  color={saved ? "#FFD700" : "#960000"}
                 />
                 <Text
                   className={`mt-1 text-center text-sm font-semibold ${
@@ -435,6 +436,15 @@ export default function CourtDetails() {
                 </View>
               </View>
             )}
+
+            <Pressable
+              onPress={() => setShowReportModal(true)}
+              className="mt-2 items-center py-3"
+              accessibilityLabel="Report an issue with this court"
+              accessibilityRole="button"
+            >
+              <Text className="text-sm text-gray-400 dark:text-white/40">Report an issue</Text>
+            </Pressable>
           </View>
         </View>
       ) : (
@@ -449,5 +459,14 @@ export default function CourtDetails() {
         </View>
       )}
     </ScrollView>
+
+    {court && (
+      <ReportModal
+        visible={showReportModal}
+        court={court}
+        onClose={() => setShowReportModal(false)}
+      />
+    )}
+    </>
   );
 }

@@ -108,6 +108,8 @@ interface Court {
   num_hoops: number | null;
   lighting: boolean | null;
   open_24h: boolean | null;
+  is_free: boolean | null;
+  is_public: boolean | null;
   hours_json: any;
   amenities_json: any;
   osm_type: string;
@@ -172,17 +174,72 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Haversine distance between two lat/lon points, in meters
+ */
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Deduplicate courts that are within thresholdMeters of each other.
+ * When merging, keeps the entry with the better name and aggregates num_hoops.
+ */
+function deduplicateCourts(courts: Court[], thresholdMeters: number = 50): Court[] {
+  const kept: Court[] = [];
+
+  for (const candidate of courts) {
+    const nearby = kept.find(
+      (k) => haversineMeters(k.latitude, k.longitude, candidate.latitude, candidate.longitude) <= thresholdMeters
+    );
+
+    if (nearby) {
+      // Aggregate hoops: add values together when both are known
+      if (candidate.num_hoops != null) {
+        nearby.num_hoops = (nearby.num_hoops ?? 0) + candidate.num_hoops;
+      }
+      // Prefer the candidate's name if the kept entry has a generated name (contains "Basketball Court")
+      if (nearby.name.endsWith('Basketball Court') && !candidate.name.endsWith('Basketball Court')) {
+        nearby.name = candidate.name;
+      }
+    } else {
+      kept.push({ ...candidate });
+    }
+  }
+
+  return kept;
+}
+
+/**
  * Fetch basketball courts from OpenStreetMap using Overpass API
  */
 async function fetchOSMCourts(bbox: string): Promise<OSMResponse> {
   const [west, south, east, north] = bbox.split(',').map(parseFloat);
 
   const query = `
-    [out:json][timeout:60];
+    [out:json][timeout:90];
     (
+      // Outdoor basketball courts (pitches)
       node["leisure"="pitch"]["sport"="basketball"](${south},${west},${north},${east});
       way["leisure"="pitch"]["sport"="basketball"](${south},${west},${north},${east});
       relation["leisure"="pitch"]["sport"="basketball"](${south},${west},${north},${east});
+      // Indoor-tagged pitches
+      node["leisure"="pitch"]["sport"="basketball"]["indoor"="yes"](${south},${west},${north},${east});
+      way["leisure"="pitch"]["sport"="basketball"]["indoor"="yes"](${south},${west},${north},${east});
+      // Sports halls and gyms with basketball
+      node["leisure"="sports_hall"]["sport"="basketball"](${south},${west},${north},${east});
+      way["leisure"="sports_hall"]["sport"="basketball"](${south},${west},${north},${east});
+      relation["leisure"="sports_hall"]["sport"="basketball"](${south},${west},${north},${east});
+      // Sports centres with basketball (YMCAs, rec centers)
+      node["leisure"="sports_centre"]["sport"="basketball"](${south},${west},${north},${east});
+      way["leisure"="sports_centre"]["sport"="basketball"](${south},${west},${north},${east});
+      relation["leisure"="sports_centre"]["sport"="basketball"](${south},${west},${north},${east});
     );
     out center body;
   `;
@@ -247,8 +304,8 @@ function transformOSMToCourt(
       // Named after the suburb
       name = `${geocodedAddress.suburb} Basketball Court`;
     } else if (geocodedAddress?.address) {
-      // Named after the street
-      const streetName = geocodedAddress.address.split(' ').slice(-2).join(' '); // Last 2 words (e.g., "Main St")
+      // Named after the street — strip leading house number to get full street name
+      const streetName = geocodedAddress.address.replace(/^\d+\s+/, ''); // e.g. "719 Brittain Drive NW" → "Brittain Drive NW"
       name = `${streetName} Basketball Court`;
     } else if (tags['addr:street']) {
       // Use OSM street tag
@@ -271,7 +328,7 @@ function transformOSMToCourt(
   let indoor = false;
   if (tags.indoor === 'yes') indoor = true;
   else if (tags.indoor === 'no') indoor = false;
-  else if (tags.leisure === 'sports_hall') indoor = true;
+  else if (tags.leisure === 'sports_hall' || tags.leisure === 'sports_centre') indoor = true;
 
   // Parse surface type
   const surfaceMap: { [key: string]: string } = {
@@ -309,10 +366,18 @@ function transformOSMToCourt(
     }
   }
 
+  // Parse free vs paid (OSM fee tag)
+  let isFree: boolean | null = null;
+  if (tags.fee === 'no') isFree = true;
+  else if (tags.fee === 'yes') isFree = false;
+
+  // Parse public vs private access (OSM access tag)
+  let isPublic: boolean | null = null;
+  if (tags.access === 'yes' || tags.access === 'public' || tags.access === 'permissive') isPublic = true;
+  else if (tags.access === 'private' || tags.access === 'members' || tags.access === 'customers') isPublic = false;
+
   // Parse amenities
   const amenities: string[] = [];
-  if (tags.access === 'yes' || tags.access === 'public') amenities.push('public_access');
-  if (tags.fee === 'no') amenities.push('free');
   if (tags.wheelchair === 'yes') amenities.push('wheelchair_accessible');
   if (tags.description) amenities.push(tags.description);
 
@@ -332,6 +397,8 @@ function transformOSMToCourt(
     num_hoops: numHoops,
     lighting,
     open_24h: open24h,
+    is_free: isFree,
+    is_public: isPublic,
     hours_json: hoursJson,
     amenities_json: amenities.length > 0 ? amenities : null,
     osm_type: element.type,
@@ -352,16 +419,10 @@ async function importCourts(supabase: any, courts: Court[], replace: boolean = f
   console.log(`📦 Importing ${courts.length} courts to Supabase...`);
 
   if (replace) {
-    console.log('🗑️  Deleting existing courts...');
-    const { error: deleteError } = await supabase
-      .from('courts')
-      .delete()
-      .neq('id', ''); // Delete all
-
-    if (deleteError) {
-      console.error('❌ Failed to delete existing courts:', deleteError);
-      throw deleteError;
-    }
+    // Note: bulk delete is blocked by a storage cascade trigger on the courts table.
+    // Upsert below will overwrite existing courts by OSM id. To fully wipe courts,
+    // delete them manually in the Supabase dashboard.
+    console.log('ℹ️  --replace: skipping bulk delete (blocked by storage trigger). Upsert will overwrite existing courts by id.');
   }
 
   // Batch insert in chunks of 100
@@ -399,7 +460,7 @@ async function importCourts(supabase: any, courts: Court[], replace: boolean = f
 const CITIES: { [key: string]: { bbox: string; metroBbox: string; state: string } } = {
   'atlanta': {
     bbox: '-84.552,33.649,-84.290,33.887',           // City proper (~240 sq mi)
-    metroBbox: '-84.820,33.384,-83.983,34.155',      // Metro: includes Marietta, Decatur, Sandy Springs
+    metroBbox: '-85.100,33.100,-83.650,34.500',      // Full 30-county MSA: Paulding, Carroll, Coweta, Henry, Walton, Barrow, Hall, Cherokee, Forsyth, Gwinnett + core
     state: 'GA',
   },
   'los angeles': {
@@ -582,8 +643,14 @@ async function main() {
 
     console.log(`   ✓ Transformed ${courts.length} courts`);
 
+    // Deduplicate courts within 50m of each other, aggregating hoops
+    const deduped = deduplicateCourts(courts, 50);
+    if (deduped.length < courts.length) {
+      console.log(`   ✓ Deduplicated ${courts.length - deduped.length} duplicate courts (within 50m)`);
+    }
+
     // Import to Supabase
-    await importCourts(supabase, courts, replace);
+    await importCourts(supabase, deduped, replace);
 
     console.log('');
     console.log('🎉 Import complete!');

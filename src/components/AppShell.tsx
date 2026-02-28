@@ -8,7 +8,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#000' : '#fff' }]}>
+      <SafeAreaView edges={['left', 'right']} style={[styles.safeArea, { backgroundColor: isDark ? '#000' : '#fff' }]}>
         <View style={styles.container}>{children}</View>
       </SafeAreaView>
     </SafeAreaProvider>

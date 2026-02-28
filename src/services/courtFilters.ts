@@ -11,6 +11,8 @@ export interface CourtFilters {
   mustHaveLighting: boolean;
   multipleHoops: boolean;
   open24Hours: boolean;
+  mustBeFree: boolean;
+  mustBePublic: boolean;
 }
 
 export const DEFAULT_FILTERS: CourtFilters = {
@@ -19,6 +21,8 @@ export const DEFAULT_FILTERS: CourtFilters = {
   mustHaveLighting: false,
   multipleHoops: false,
   open24Hours: false,
+  mustBeFree: false,
+  mustBePublic: false,
 };
 
 /**
@@ -84,6 +88,12 @@ export function applyFilters(courts: Court[], filters: CourtFilters): Court[] {
     // Filter by 24 hour access
     if (filters.open24Hours && !court.open_24h) return false;
 
+    // Filter by free access
+    if (filters.mustBeFree && court.is_free !== true) return false;
+
+    // Filter by public access
+    if (filters.mustBePublic && court.is_public !== true) return false;
+
     return true;
   });
 }
@@ -97,6 +107,8 @@ export function hasActiveFilters(filters: CourtFilters): boolean {
     filters.maxDistanceMiles !== DEFAULT_FILTERS.maxDistanceMiles ||
     filters.mustHaveLighting !== DEFAULT_FILTERS.mustHaveLighting ||
     filters.multipleHoops !== DEFAULT_FILTERS.multipleHoops ||
-    filters.open24Hours !== DEFAULT_FILTERS.open24Hours
+    filters.open24Hours !== DEFAULT_FILTERS.open24Hours ||
+    filters.mustBeFree !== DEFAULT_FILTERS.mustBeFree ||
+    filters.mustBePublic !== DEFAULT_FILTERS.mustBePublic
   );
 }

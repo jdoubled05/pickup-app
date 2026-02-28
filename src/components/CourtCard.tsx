@@ -94,6 +94,24 @@ export function CourtCard({ court, index, weather }: CourtCardProps) {
                 </Text>
               </View>
             )}
+
+            {/* Free / Paid */}
+            {court.is_free != null && (
+              <View className="rounded-lg bg-gray-200 dark:bg-white/10 px-3 py-1.5">
+                <Text className="text-xs font-medium text-gray-600 dark:text-white/70">
+                  {court.is_free ? 'Free' : 'Paid'}
+                </Text>
+              </View>
+            )}
+
+            {/* Public / Private */}
+            {court.is_public != null && (
+              <View className="rounded-lg bg-gray-200 dark:bg-white/10 px-3 py-1.5">
+                <Text className="text-xs font-medium text-gray-600 dark:text-white/70">
+                  {court.is_public ? 'Public' : 'Private'}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </Pressable>

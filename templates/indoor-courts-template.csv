@@ -1,0 +1,3 @@
+name,description,address,city,state,postal_code,country,latitude,longitude,surface_type,num_hoops,lighting,open_24h,is_free,is_public,hours_open,hours_close,timezone
+YMCA Downtown Atlanta,Full-size hardwood court. Open to members and day pass holders.,100 Edgewood Ave NE,Atlanta,GA,30303,United States,33.7535,-84.3857,hardwood,2,yes,no,no,yes,06:00,22:00,America/New_York
+Inman Park Recreation Center,Two side courts. Free with city resident card.,1540 DeKalb Ave NE,Atlanta,GA,30307,United States,33.7601,-84.3513,hardwood,4,yes,no,yes,yes,08:00,21:00,America/New_York

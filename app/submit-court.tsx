@@ -7,6 +7,7 @@ import { Text } from '@/src/components/ui/Text';
 import { Button } from '@/src/components/ui/Button';
 import { supabase } from '@/src/services/supabase';
 import { getAnonymousUserId } from '@/src/services/checkins';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 export default function SubmitCourtScreen() {
   const router = useRouter();
@@ -150,13 +151,6 @@ export default function SubmitCourtScreen() {
           </View>
         </View>
 
-        {/* Reward Badge */}
-        <View className="mb-6 rounded-2xl border border-vibrant-gold/30 bg-vibrant-gold/10 p-4">
-          <Text className="text-sm font-semibold text-vibrant-gold">
-            🎁 Get 1 month free premium when your submission is approved!
-          </Text>
-        </View>
-
         {/* Location Section */}
         <View className="mb-6">
           <Text className="mb-3 text-sm font-semibold text-gray-500 dark:text-white/60">
@@ -172,9 +166,12 @@ export default function SubmitCourtScreen() {
             accessibilityLabel="Get current location"
             accessibilityRole="button"
           >
-            <Text className="text-center font-bold text-brand dark:text-brand-light">
-              {gettingLocation ? '📍 Getting Location...' : '📍 Get Current Location'}
-            </Text>
+            <View className="flex-row items-center justify-center gap-2">
+              <Ionicons name="location" size={16} color="#960000" />
+              <Text className="font-bold text-brand dark:text-brand-light">
+                {gettingLocation ? 'Getting Location...' : 'Get Current Location'}
+              </Text>
+            </View>
             <Text className="mt-1 text-center text-xs text-brand/80 dark:text-brand-light/70">
               Stand at the court and tap this button
             </Text>

@@ -51,6 +51,10 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen
+          name="submit-court"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
           name="saved"
           options={{
             headerShown: true,

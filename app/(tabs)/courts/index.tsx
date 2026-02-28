@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, View, ScrollView, useColorScheme } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, TextInput, View, ScrollView, useColorScheme } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { Link } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
-import { SwipeableCourtCard } from "@/src/components/SwipeableCourtCard";
+import { SwipeableCourtCard, closeCurrentSwipeable } from "@/src/components/SwipeableCourtCard";
 import { BasketballRefreshControl } from "@/src/components/BasketballRefreshControl";
 import { FilterModal } from "@/src/components/FilterModal";
-import { Court, listCourtsNearby } from "@/src/services/courts";
+import { Court, listCourtsNearby, searchCourts } from "@/src/services/courts";
 import { getForegroundLocationOrDefault } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import { hydrateSavedCourts, subscribeSavedCourts } from "@/src/services/savedCourts";
@@ -31,7 +32,7 @@ type FilterType = 'hot' | 'all' | 'saved';
 export default function CourtsIndex() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [courtActivity, setCourtActivity] = useState<Map<string, number>>(new Map());
-  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [courtWeather, setCourtWeather] = useState<Map<string, WeatherData | null>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,9 +40,13 @@ export default function CourtsIndex() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [filters, setFilters] = useState<CourtFilters>(DEFAULT_FILTERS);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Court[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const supabaseStatus = getSupabaseEnvStatus();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
 
   // Sort courts by distance
   const sortedCourts = useMemo(() => {
@@ -91,8 +96,31 @@ export default function CourtsIndex() {
     return { hotCourts: hot, regularCourts: regular };
   }, [sortedCourts, courtActivity]);
 
+  // Debounced DB search — fires 400ms after the user stops typing
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const results = await searchCourts(trimmed);
+      setSearchResults(results);
+      setSearchLoading(false);
+    }, 400);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
+
   // Filter based on active filter and advanced filters
   const filteredCourts = useMemo(() => {
+    // While a search query is active, show DB search results directly
+    if (searchQuery.trim().length >= 2) {
+      return searchResults ?? [];
+    }
+
     let base: Court[];
     switch (activeFilter) {
       case 'hot':
@@ -106,9 +134,8 @@ export default function CourtsIndex() {
         base = sortedCourts;
     }
 
-    // Apply advanced filters
     return applyFilters(base, filters);
-  }, [activeFilter, hotCourts, sortedCourts, savedIds, filters]);
+  }, [activeFilter, hotCourts, sortedCourts, savedIds, filters, searchQuery, searchResults]);
 
   const loadCourts = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -135,12 +162,14 @@ export default function CourtsIndex() {
         setCourtActivity(activity);
       }
 
-      // Fetch weather for user location
-      const weatherData = await getWeatherForLocation(
-        location.coords.lat,
-        location.coords.lon
+      // Fetch weather per court location (service caches by ~5km grid so nearby courts share a request)
+      const weatherEntries = await Promise.all(
+        data.map(async (court) => {
+          const w = await getWeatherForLocation(court.latitude, court.longitude);
+          return [court.id, w] as [string, WeatherData | null];
+        })
       );
-      setWeather(weatherData);
+      setCourtWeather(new Map(weatherEntries));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
     } finally {
@@ -198,7 +227,7 @@ export default function CourtsIndex() {
     <GestureHandlerRootView className="flex-1">
       <View className="flex-1 bg-white dark:bg-black">
       {/* Header */}
-      <View className="px-6 pb-4 pt-6">
+      <View className="px-6 pb-4" style={{ paddingTop: insets.top + 8 }}>
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-4xl font-extrabold text-gray-900 dark:text-white">PICKUP</Text>
@@ -218,12 +247,49 @@ export default function CourtsIndex() {
         </Text>
       </View>
 
+      {/* Search Bar */}
+      <View className="px-6 pb-3">
+        <View className="flex-row items-center rounded-2xl border border-gray-200 dark:border-white/20 bg-gray-100 dark:bg-white/5 px-3 py-2">
+          <Ionicons
+            name="search"
+            size={16}
+            color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
+          />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search courts..."
+            placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
+            style={{
+              flex: 1,
+              marginLeft: 8,
+              fontSize: 15,
+              color: isDark ? '#fff' : '#111',
+            }}
+            returnKeyType="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchLoading ? (
+            <ActivityIndicator size="small" color={isDark ? '#fff' : '#960000'} />
+          ) : searchQuery.length > 0 ? (
+            <Pressable onPress={() => { setSearchQuery(''); setSearchResults(null); }} hitSlop={8}>
+              <Ionicons
+                name="close-circle"
+                size={16}
+                color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
+              />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       {/* Filter Chips */}
       <View className="pb-4 px-6">
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View className="flex-row gap-2">
             <Pressable
-              onPress={() => setActiveFilter('all')}
+              onPress={() => { setActiveFilter('all'); setSearchQuery(''); setSearchResults(null); }}
               className={`flex-row items-center rounded-full px-4 py-2 ${
                 activeFilter === 'all'
                   ? 'bg-brand'
@@ -249,7 +315,7 @@ export default function CourtsIndex() {
 
             {hotCourts.length > 0 && (
               <Pressable
-                onPress={() => setActiveFilter('hot')}
+                onPress={() => { setActiveFilter('hot'); setSearchQuery(''); setSearchResults(null); }}
                 className={`flex-row items-center rounded-full px-4 py-2 ${
                   activeFilter === 'hot'
                     ? 'bg-brand'
@@ -276,7 +342,7 @@ export default function CourtsIndex() {
 
             {savedIds.length > 0 && (
               <Pressable
-                onPress={() => setActiveFilter('saved')}
+                onPress={() => { setActiveFilter('saved'); setSearchQuery(''); setSearchResults(null); }}
                 className={`flex-row items-center rounded-full px-4 py-2 ${
                   activeFilter === 'saved'
                     ? 'bg-vibrant-gold'
@@ -385,25 +451,39 @@ export default function CourtsIndex() {
             />
           }
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 4, paddingBottom: 72 }}
+          onScrollBeginDrag={closeCurrentSwipeable}
+          onMomentumScrollBegin={closeCurrentSwipeable}
           ListEmptyComponent={
             <View className="items-center rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 p-8">
-              <Text className="text-6xl">
-                {activeFilter === 'hot' ? '🏀' : activeFilter === 'saved' ? '⭐' : '📍'}
-              </Text>
+              <Ionicons
+                name={
+                  searchQuery.trim() ? 'search' :
+                  activeFilter === 'hot' ? 'flame' :
+                  activeFilter === 'saved' ? 'star' : 'location'
+                }
+                size={40}
+                color={
+                  activeFilter === 'saved' && !searchQuery.trim() ? '#FFD700' : '#960000'
+                }
+              />
               <Text className="mt-4 text-center text-lg font-semibold text-gray-900 dark:text-white">
-                {activeFilter === 'hot'
-                  ? 'No active games right now'
-                  : activeFilter === 'saved'
-                    ? 'No saved courts yet'
-                    : 'No courts found'}
+                {searchQuery.trim()
+                  ? 'No courts match your search'
+                  : activeFilter === 'hot'
+                    ? 'No active games right now'
+                    : activeFilter === 'saved'
+                      ? 'No saved courts yet'
+                      : 'No courts found'}
               </Text>
               <Text className="mt-2 text-center text-gray-600 dark:text-white/60">
-                {activeFilter === 'hot'
-                  ? 'Be the first to check in at a court!'
-                  : activeFilter === 'saved'
-                    ? 'Save courts to quickly find them later'
-                    : 'Try adjusting your location'}
+                {searchQuery.trim()
+                  ? 'Try a different name or address'
+                  : activeFilter === 'hot'
+                    ? 'Be the first to check in at a court!'
+                    : activeFilter === 'saved'
+                      ? 'Save courts to quickly find them later'
+                      : 'Try adjusting your location'}
               </Text>
             </View>
           }
@@ -416,7 +496,7 @@ export default function CourtsIndex() {
                 court={item}
                 index={index}
                 checkInsCount={checkIns}
-                weather={weather}
+                weather={courtWeather.get(item.id) ?? null}
                 isHot={isHot}
               />
             );

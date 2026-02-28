@@ -14,6 +14,8 @@ export type Court = {
   num_hoops: number | null;
   lighting: boolean | null;
   open_24h: boolean | null;
+  is_free: boolean | null;
+  is_public: boolean | null;
   hours_json: unknown | null;
   amenities_json: unknown | null;
   photos_count: number | null;

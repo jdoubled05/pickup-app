@@ -1,5 +1,7 @@
 import {
+  DbCourt,
   DbCourtNearby,
+  mapDbCourtToCourt,
   mapDbCourtNearbyToCourt,
 } from "@/src/types/db";
 import { getSupabaseEnvStatus, supabase } from "@/src/services/supabase";
@@ -26,6 +28,8 @@ export const MOCK_COURTS: Court[] = [
     num_hoops: 4,
     lighting: true,
     open_24h: false,
+    is_free: true,
+    is_public: true,
     hours_json: { open: "06:00", close: "22:00" },
     amenities_json: ["lights", "restrooms"],
     photos_count: 3,
@@ -52,6 +56,8 @@ export const MOCK_COURTS: Court[] = [
     num_hoops: 2,
     lighting: false,
     open_24h: false,
+    is_free: true,
+    is_public: true,
     hours_json: { open: "sunrise", close: "sunset" },
     amenities_json: ["water"],
     photos_count: 2,
@@ -78,6 +84,8 @@ export const MOCK_COURTS: Court[] = [
     num_hoops: 6,
     lighting: true,
     open_24h: false,
+    is_free: null,
+    is_public: true,
     hours_json: { open: "06:00", close: "23:00" },
     amenities_json: ["lights", "parking"],
     photos_count: 5,
@@ -155,6 +163,37 @@ export async function listCourtsNearby(
       console.warn("Supabase courts_nearby RPC failed:", err);
     }
     return MOCK_COURTS;
+  }
+}
+
+export async function searchCourts(query: string): Promise<Court[]> {
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured || !supabase) {
+    const q = query.toLowerCase();
+    return MOCK_COURTS.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.address ?? '').toLowerCase().includes(q) ||
+        (c.city ?? '').toLowerCase().includes(q)
+    );
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('courts')
+      .select('*')
+      .or(`name.ilike.%${query}%,address.ilike.%${query}%,city.ilike.%${query}%`)
+      .limit(50);
+
+    if (error) {
+      if (__DEV__) console.warn('Supabase searchCourts error:', error.message);
+      return [];
+    }
+
+    return (data ?? []).map((row) => mapDbCourtToCourt(row as DbCourt));
+  } catch (err) {
+    if (__DEV__) console.warn('Supabase searchCourts failed:', err);
+    return [];
   }
 }
 

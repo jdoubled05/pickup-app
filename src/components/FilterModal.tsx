@@ -186,7 +186,7 @@ export function FilterModal({ visible, filters, onClose, onApply }: FilterModalP
               </View>
 
               {/* Open 24 Hours */}
-              <View className="flex-row items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+              <View className="mb-3 flex-row items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
                 <View className="flex-row items-center">
                   <Text className="mr-3 text-xl">⏰</Text>
                   <Text className="text-base font-medium text-gray-900 dark:text-white">Open 24 Hours</Text>
@@ -197,6 +197,38 @@ export function FilterModal({ visible, filters, onClose, onApply }: FilterModalP
                   trackColor={{ false: '#3e3e3e', true: '#960000' }}
                   thumbColor="#ffffff"
                   accessibilityLabel="Filter for courts open 24 hours"
+                  accessibilityRole="switch"
+                />
+              </View>
+
+              {/* Free to Play */}
+              <View className="mb-3 flex-row items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+                <View className="flex-row items-center">
+                  <Ionicons name="cash-outline" size={20} color={isDark ? '#fff' : '#374151'} style={{ marginRight: 12 }} />
+                  <Text className="text-base font-medium text-gray-900 dark:text-white">Free to Play</Text>
+                </View>
+                <Switch
+                  value={localFilters.mustBeFree}
+                  onValueChange={() => handleToggle('mustBeFree')}
+                  trackColor={{ false: '#3e3e3e', true: '#960000' }}
+                  thumbColor="#ffffff"
+                  accessibilityLabel="Filter for free courts"
+                  accessibilityRole="switch"
+                />
+              </View>
+
+              {/* Public Access */}
+              <View className="flex-row items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+                <View className="flex-row items-center">
+                  <Ionicons name="people-outline" size={20} color={isDark ? '#fff' : '#374151'} style={{ marginRight: 12 }} />
+                  <Text className="text-base font-medium text-gray-900 dark:text-white">Public Access</Text>
+                </View>
+                <Switch
+                  value={localFilters.mustBePublic}
+                  onValueChange={() => handleToggle('mustBePublic')}
+                  trackColor={{ false: '#3e3e3e', true: '#960000' }}
+                  thumbColor="#ffffff"
+                  accessibilityLabel="Filter for publicly accessible courts"
                   accessibilityRole="switch"
                 />
               </View>
