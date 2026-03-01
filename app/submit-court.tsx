@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Pressable, Switch, TextInput, Alert } from 'react-native';
+import { View, ScrollView, Pressable, Switch, TextInput, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Text } from '@/src/components/ui/Text';
 import { Button } from '@/src/components/ui/Button';
 import { supabase } from '@/src/services/supabase';
 import { getAnonymousUserId } from '@/src/services/checkins';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+const MAX_PHOTOS = 3;
+
 export default function SubmitCourtScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [submitting, setSubmitting] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -23,6 +30,7 @@ export default function SubmitCourtScreen() {
     latitude: null as number | null,
     longitude: null as number | null,
     indoor: false,
+    courtSize: 'full' as 'full' | 'half' | 'both',
     numHoops: '',
     lighting: false,
     surfaceType: '',
@@ -62,6 +70,83 @@ export default function SubmitCourtScreen() {
     }
   };
 
+  const handleAddPhoto = () => {
+    Alert.alert('Add Photo', 'Choose a source', [
+      {
+        text: 'Camera',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission Needed', 'Camera access is required to take photos.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+            exif: false,
+          });
+          if (!result.canceled) {
+            setPhotos((prev) => [...prev, result.assets[0]].slice(0, MAX_PHOTOS));
+          }
+        },
+      },
+      {
+        text: 'Photo Library',
+        onPress: async () => {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== 'granted') {
+            Alert.alert('Permission Needed', 'Photo library access is required to select photos.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [4, 3],
+            quality: 0.8,
+            exif: false,
+          });
+          if (!result.canceled) {
+            setPhotos((prev) => [...prev, result.assets[0]].slice(0, MAX_PHOTOS));
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    Alert.alert('Remove Photo', 'Remove this photo?', [
+      { text: 'Remove', style: 'destructive', onPress: () => setPhotos((prev) => prev.filter((_, i) => i !== index)) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const uploadPendingPhotos = async (pendingCourtId: string): Promise<void> => {
+    if (!supabase || photos.length === 0) return;
+    const userId = await getAnonymousUserId();
+    await Promise.allSettled(
+      photos.map(async (asset, i) => {
+        try {
+          const fileExt = asset.uri.split('.').pop() ?? 'jpg';
+          const storagePath = `pending-courts/${pendingCourtId}/${userId}_${i}.${fileExt}`;
+          const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+          const binaryString = atob(base64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let j = 0; j < binaryString.length; j++) {
+            bytes[j] = binaryString.charCodeAt(j);
+          }
+          await supabase.storage.from('court-photos').upload(storagePath, bytes, {
+            contentType: `image/${fileExt}`,
+            upsert: false,
+          });
+        } catch {
+          // Non-critical — submission still succeeds without photos
+        }
+      })
+    );
+  };
+
   const handleSubmit = async () => {
     // Validation
     if (!formData.name.trim()) {
@@ -83,33 +168,43 @@ export default function SubmitCourtScreen() {
     try {
       const userId = await getAnonymousUserId();
 
-      const { error } = await supabase.from('pending_courts').insert({
-        name: formData.name.trim(),
-        address: formData.address.trim() || null,
-        city: formData.city.trim() || null,
-        state: formData.state.trim() || null,
-        postal_code: formData.postalCode.trim() || null,
-        latitude: formData.latitude,
-        longitude: formData.longitude,
-        indoor: formData.indoor,
-        num_hoops: formData.numHoops ? parseInt(formData.numHoops, 10) : null,
-        lighting: formData.lighting,
-        surface_type: formData.surfaceType.trim() || null,
-        notes: formData.notes.trim() || null,
-        submitted_by: userId,
-        status: 'pending',
-      });
+      const { data: inserted, error } = await supabase
+        .from('pending_courts')
+        .insert({
+          name: formData.name.trim(),
+          address: formData.address.trim() || null,
+          city: formData.city.trim() || null,
+          state: formData.state.trim() || null,
+          postal_code: formData.postalCode.trim() || null,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          indoor: formData.indoor,
+          court_size: formData.courtSize,
+          num_hoops: formData.numHoops ? parseInt(formData.numHoops, 10) : null,
+          lighting: formData.lighting,
+          surface_type: formData.surfaceType.trim() || null,
+          notes: formData.notes.trim() || null,
+          submitted_by: userId,
+          status: 'pending',
+        })
+        .select('id')
+        .single();
 
       if (error) {
         console.error('Submission error:', error);
         throw error;
       }
 
+      // Upload photos in the background — non-blocking so UX stays snappy
+      if (inserted?.id) {
+        uploadPendingPhotos(inserted.id);
+      }
+
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
         'Thank You! 🏀',
-        'Your court submission has been received. We\'ll review and add it within 24 hours. You\'ll get 1 month of free premium when approved!',
+        'Your court submission has been received. We\'ll review and add it within 24 hours.',
         [
           {
             text: 'OK',
@@ -130,7 +225,7 @@ export default function SubmitCourtScreen() {
 
   return (
     <ScrollView className="flex-1 bg-white dark:bg-black">
-      <View className="px-6 py-6">
+      <View className="px-6 pb-6" style={{ paddingTop: insets.top + 16 }}>
         {/* Header */}
         <View className="mb-6 flex-row items-center">
           <Pressable
@@ -254,6 +349,41 @@ export default function SubmitCourtScreen() {
             />
           </View>
 
+          <View className="mb-4">
+            <Text className="mb-2 text-sm font-medium text-gray-900 dark:text-white">Court Size</Text>
+            <View className="flex-row gap-2">
+              {(['full', 'half', 'both'] as const).map((option) => (
+                <Pressable
+                  key={option}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setFormData({ ...formData, courtSize: option });
+                  }}
+                  className={`flex-1 rounded-xl border py-3 ${
+                    formData.courtSize === option
+                      ? 'border-brand bg-brand/10'
+                      : 'border-gray-200 dark:border-white/20 bg-gray-100 dark:bg-white/5'
+                  }`}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: formData.courtSize === option }}
+                >
+                  <Text className={`text-center text-sm font-semibold ${
+                    formData.courtSize === option ? 'text-brand' : 'text-gray-600 dark:text-white/60'
+                  }`}>
+                    {option === 'full' ? 'Full' : option === 'half' ? 'Half' : 'Both'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text className="mt-1.5 text-xs text-gray-400 dark:text-white/40">
+              {formData.courtSize === 'full'
+                ? 'Full length court with two baskets'
+                : formData.courtSize === 'half'
+                ? 'Half court with one basket'
+                : 'Has both full and half courts available'}
+            </Text>
+          </View>
+
           <View className="mb-4 flex-row items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
             <Text className="text-base font-medium text-gray-900 dark:text-white">
               Has Lighting
@@ -302,6 +432,49 @@ export default function SubmitCourtScreen() {
             textAlignVertical="top"
             accessibilityLabel="Additional notes"
           />
+        </View>
+
+        {/* Photos */}
+        <View className="mb-6">
+          <Text className="mb-1 text-sm font-semibold text-gray-500 dark:text-white/60">
+            PHOTOS (OPTIONAL)
+          </Text>
+          <Text className="mb-3 text-xs text-gray-400 dark:text-white/40">
+            Add up to {MAX_PHOTOS} photos to help reviewers verify the court
+          </Text>
+          <View className="flex-row gap-3">
+            {photos.map((photo, index) => (
+              <Pressable
+                key={index}
+                onPress={() => handleRemovePhoto(index)}
+                className="relative overflow-hidden rounded-xl"
+                style={{ width: 88, height: 88 }}
+                accessibilityLabel="Remove photo"
+                accessibilityRole="button"
+              >
+                <Image
+                  source={{ uri: photo.uri }}
+                  style={{ width: 88, height: 88 }}
+                  resizeMode="cover"
+                />
+                <View className="absolute right-1 top-1 h-5 w-5 items-center justify-center rounded-full bg-black/60">
+                  <Ionicons name="close" size={12} color="#fff" />
+                </View>
+              </Pressable>
+            ))}
+            {photos.length < MAX_PHOTOS && (
+              <Pressable
+                onPress={handleAddPhoto}
+                className="items-center justify-center rounded-xl border border-dashed border-gray-300 dark:border-white/20"
+                style={{ width: 88, height: 88 }}
+                accessibilityLabel="Add photo"
+                accessibilityRole="button"
+              >
+                <Ionicons name="camera-outline" size={24} color="#960000" />
+                <Text className="mt-1 text-xs text-brand dark:text-brand-light">Add Photo</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Submit Button */}

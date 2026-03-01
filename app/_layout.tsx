@@ -7,6 +7,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Notifications from "expo-notifications";
 import { AppShell } from "@/src/components/AppShell";
 import { configureNotificationHandler } from "@/src/services/notifications";
+import { hasCompletedOnboarding } from "@/src/services/onboarding";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -16,6 +17,15 @@ export default function RootLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
+  // Show onboarding on first launch
+  useEffect(() => {
+    hasCompletedOnboarding().then((completed) => {
+      if (!completed) {
+        router.replace("/onboarding");
+      }
+    });
+  }, [router]);
 
   // Initialize notification handler
   useEffect(() => {
@@ -44,6 +54,10 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="onboarding"
+          options={{ headerShown: false, presentation: "fullScreenModal", gestureEnabled: false }}
+        />
         <Stack.Screen
           name="court/[id]"
           options={{
