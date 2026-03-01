@@ -77,6 +77,15 @@ export function CourtCard({ court, index, weather }: CourtCardProps) {
               </Text>
             </View>
 
+            {/* Court size */}
+            {court.court_size != null && (
+              <View className="rounded-lg bg-gray-200 dark:bg-white/10 px-3 py-1.5">
+                <Text className="text-xs font-medium text-gray-600 dark:text-white/70">
+                  {court.court_size === 'full' ? 'Full Court' : court.court_size === 'half' ? 'Half Court' : 'Full & Half'}
+                </Text>
+              </View>
+            )}
+
             {/* Hoops */}
             {court.num_hoops != null && (
               <View className="rounded-lg bg-gray-200 dark:bg-white/10 px-3 py-1.5">

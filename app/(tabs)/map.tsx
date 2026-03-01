@@ -1,21 +1,21 @@
 import React, { useRef } from "react";
 import { ActivityIndicator, Pressable, TextInput, View, useColorScheme } from "react-native";
 import { Region } from "react-native-maps";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
 import { CourtsMap } from "@/src/components/Map/CourtsMap";
 import { BottomSheetCourtPreview } from "@/src/components/Map/BottomSheetCourtPreview";
-import { Court, listCourtsNearby } from "@/src/services/courts";
+import { Court, listCourtsNearby, searchCourts } from "@/src/services/courts";
 import {
   DEFAULT_CENTER,
   getForegroundLocationOrDefault,
   geocodeAddress,
 } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
-import { getCourtActivityBatch } from "@/src/services/courtActivity";
+import { getCourtActivityBatch, subscribeToActivityUpdates } from "@/src/services/courtActivity";
 
 type MapErrorBoundaryProps = {
   children: React.ReactNode;
@@ -50,11 +50,18 @@ class MapErrorBoundary extends React.Component<MapErrorBoundaryProps, MapErrorBo
 
 export default function MapsTest() {
   const router = useRouter();
+  const { lat, lon, courtId: focusCourtId } = useLocalSearchParams<{ lat?: string; lon?: string; courtId?: string }>();
   const supabaseStatus = getSupabaseEnvStatus();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
-  const [center, setCenter] = React.useState(DEFAULT_CENTER);
+  const [center, setCenter] = React.useState(() => {
+    const parsedLat = lat ? parseFloat(lat) : NaN;
+    const parsedLon = lon ? parseFloat(lon) : NaN;
+    return Number.isFinite(parsedLat) && Number.isFinite(parsedLon)
+      ? { lat: parsedLat, lon: parsedLon }
+      : DEFAULT_CENTER;
+  });
   const [locationSource, setLocationSource] = React.useState<"device" | "default">(
     "default"
   );
@@ -68,6 +75,8 @@ export default function MapsTest() {
   const [recenterLocked, setRecenterLocked] = React.useState(false);
   const [searchText, setSearchText] = React.useState('');
   const [searchLoading, setSearchLoading] = React.useState(false);
+  const [searchFocused, setSearchFocused] = React.useState(false);
+  const [suggestionResults, setSuggestionResults] = React.useState<Court[] | null>(null);
   const [mapRefreshing, setMapRefreshing] = React.useState(false);
   const regionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks programmatic region changes (recenter/search) to skip auto-fetch
@@ -97,17 +106,29 @@ export default function MapsTest() {
   const loadCourts = React.useCallback(async () => {
     setLoading(true);
     setError(null);
-    const location = await getForegroundLocationOrDefault();
-    setCenter(location.coords);
-    setLocationSource(location.source);
+    const parsedLat = lat ? parseFloat(lat) : NaN;
+    const parsedLon = lon ? parseFloat(lon) : NaN;
+    const hasFocusCoords = Number.isFinite(parsedLat) && Number.isFinite(parsedLon);
+    const coords = hasFocusCoords
+      ? { lat: parsedLat, lon: parsedLon }
+      : (await getForegroundLocationOrDefault()).coords;
+    if (!hasFocusCoords) {
+      const location = await getForegroundLocationOrDefault();
+      setCenter(location.coords);
+      setLocationSource(location.source);
+    }
     try {
-      await fetchCourts(location.coords);
+      await fetchCourts(coords);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
     } finally {
       setLoading(false);
+      if (hasFocusCoords) {
+        skipRegionFetchRef.current += 1;
+        setRecenterSignal((v) => v + 1);
+      }
     }
-  }, []);
+  }, [lat, lon]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -124,6 +145,22 @@ export default function MapsTest() {
       isMounted = false;
     };
   }, [loadCourts]);
+
+  // Auto-select the focused court once courts have loaded
+  React.useEffect(() => {
+    if (focusCourtId && courts.length > 0 && !selectedCourt) {
+      const match = courts.find((c) => c.id === focusCourtId);
+      if (match) setSelectedCourt(match);
+    }
+  }, [focusCourtId, courts, selectedCourt]);
+
+  // Subscribe to real-time activity updates so the map reflects check-ins live
+  React.useEffect(() => {
+    if (!supabaseStatus.configured || courts.length === 0) return;
+    const courtIds = courts.map((c) => c.id);
+    const unsubscribe = subscribeToActivityUpdates(courtIds, setCourtActivity);
+    return unsubscribe;
+  }, [courts, supabaseStatus.configured]);
 
   const handleSelectCourt = (courtId: string) => {
     const court = courts.find((c) => c.id === courtId);
@@ -193,6 +230,50 @@ export default function MapsTest() {
     }
   }, [searchText, fetchCourts]);
 
+  // Debounced global court search for suggestions (no distance filter)
+  React.useEffect(() => {
+    const q = searchText.trim();
+    if (!searchFocused || q.length < 1) {
+      setSuggestionResults(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const results = await searchCourts(q);
+      setSuggestionResults(results);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchText, searchFocused]);
+
+  // Suggestions — use global search results (no distance limit) when available, else viewport courts
+  const { mapCitySuggestions, mapCourtSuggestions } = React.useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    if (!searchFocused || q.length < 1) return { mapCitySuggestions: [], mapCourtSuggestions: [] };
+
+    const source = suggestionResults && suggestionResults.length > 0 ? suggestionResults : courts;
+
+    const cityMap = new Map<string, { city: string; state: string | null; lat: number; lon: number }>();
+    for (const c of source) {
+      if (!c.city || typeof c.latitude !== 'number' || typeof c.longitude !== 'number') continue;
+      const key = `${c.city}|${c.state ?? ''}`;
+      if (!cityMap.has(key) && (c.city.toLowerCase().includes(q) || (c.state ?? '').toLowerCase().includes(q))) {
+        cityMap.set(key, { city: c.city, state: c.state ?? null, lat: c.latitude, lon: c.longitude });
+      }
+    }
+
+    const courtMatches = source
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.address ?? '').toLowerCase().includes(q)
+      )
+      .slice(0, 4);
+
+    return {
+      mapCitySuggestions: [...cityMap.values()].slice(0, 2),
+      mapCourtSuggestions: courtMatches,
+    };
+  }, [searchText, searchFocused, courts, suggestionResults]);
+
   const mappableCourts = React.useMemo(
     () =>
       courts.filter(
@@ -244,8 +325,10 @@ export default function MapsTest() {
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             onSubmitEditing={handleLocationSearch}
-            placeholder="Search a location..."
+            placeholder="Search courts or a location..."
             placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
             style={{
               flex: 1,
@@ -269,6 +352,99 @@ export default function MapsTest() {
             </Pressable>
           ) : null}
         </View>
+
+        {/* Suggestions dropdown — cities then courts */}
+        {(mapCitySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
+          <View
+            style={{
+              marginTop: 6,
+              borderRadius: 16,
+              overflow: 'hidden',
+              backgroundColor: isDark ? 'rgba(20,20,20,0.97)' : 'rgba(255,255,255,0.98)',
+              borderWidth: 1,
+              borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 12,
+              elevation: 8,
+            }}
+          >
+            {mapCitySuggestions.map((city, i) => {
+              const isLast = i === mapCitySuggestions.length - 1 && mapCourtSuggestions.length === 0;
+              return (
+                <Pressable
+                  key={`city-${city.city}-${city.state}`}
+                  onPress={() => {
+                    setSearchFocused(false);
+                    setSearchText(city.city);
+                    const coords = { lat: city.lat, lon: city.lon };
+                    setCenter(coords);
+                    skipRegionFetchRef.current += 1;
+                    setRecenterSignal((v) => v + 1);
+                    fetchCourts(coords);
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderBottomWidth: isLast ? 0 : 1,
+                    borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+                  }}
+                >
+                  <Ionicons name="business-outline" size={16} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#fff' : '#111' }} numberOfLines={1}>
+                      {city.city}{city.state ? `, ${city.state}` : ''}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} />
+                </Pressable>
+              );
+            })}
+            {mapCourtSuggestions.map((court, i) => (
+              <Pressable
+                key={court.id}
+                onPress={() => {
+                  setSearchFocused(false);
+                  setSearchText('');
+                  if (typeof court.latitude === 'number' && typeof court.longitude === 'number') {
+                    const coords = { lat: court.latitude, lon: court.longitude };
+                    setCenter(coords);
+                    skipRegionFetchRef.current += 1;
+                    setRecenterSignal((v) => v + 1);
+                    setSelectedCourt(court);
+                    fetchCourts(coords);
+                  }
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 12,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderBottomWidth: i < mapCourtSuggestions.length - 1 ? 1 : 0,
+                  borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
+                }}
+              >
+                <Ionicons name="basketball-outline" size={16} color="#960000" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#fff' : '#111' }} numberOfLines={1}>
+                    {court.name}
+                  </Text>
+                  {(court.city || court.state) && (
+                    <Text style={{ fontSize: 12, color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} numberOfLines={1}>
+                      {[court.city, court.state].filter(Boolean).join(', ')}
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} />
+              </Pressable>
+            ))}
+          </View>
+        )}
       </View>
 
       {mapRefreshing && !loading ? (

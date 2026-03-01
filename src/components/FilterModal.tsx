@@ -139,10 +139,10 @@ export function FilterModal({ visible, filters, onClose, onApply }: FilterModalP
                 value={localFilters.maxDistanceMiles}
                 onValueChange={handleDistanceChange}
                 minimumValue={1}
-                maximumValue={25}
-                step={1}
+                maximumValue={100}
+                step={5}
                 minimumTrackTintColor="#960000"
-                maximumTrackTintColor="#ffffff30"
+                maximumTrackTintColor={isDark ? "#ffffff40" : "#00000020"}
                 thumbTintColor="#960000"
                 accessibilityLabel={`Maximum distance: ${localFilters.maxDistanceMiles} miles`}
                 accessibilityRole="adjustable"
@@ -181,6 +181,22 @@ export function FilterModal({ visible, filters, onClose, onApply }: FilterModalP
                   trackColor={{ false: '#3e3e3e', true: '#960000' }}
                   thumbColor="#ffffff"
                   accessibilityLabel="Filter for courts with multiple hoops"
+                  accessibilityRole="switch"
+                />
+              </View>
+
+              {/* Full Court Only */}
+              <View className="mb-3 flex-row items-center justify-between rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 px-4 py-3">
+                <View className="flex-row items-center">
+                  <Text className="mr-3 text-xl">⛹️</Text>
+                  <Text className="text-base font-medium text-gray-900 dark:text-white">Full Court Only</Text>
+                </View>
+                <Switch
+                  value={localFilters.fullCourtOnly}
+                  onValueChange={() => handleToggle('fullCourtOnly')}
+                  trackColor={{ false: '#3e3e3e', true: '#960000' }}
+                  thumbColor="#ffffff"
+                  accessibilityLabel="Filter for full courts only"
                   accessibilityRole="switch"
                 />
               </View>

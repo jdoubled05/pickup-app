@@ -69,6 +69,32 @@ export async function getActiveCheckInsCount(courtId: string): Promise<number> {
 }
 
 /**
+ * Subscribes to real-time check-in changes for a set of courts.
+ * Calls callback with a refreshed activity map whenever any check-in is inserted or deleted.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToActivityUpdates(
+  courtIds: string[],
+  callback: (activity: Map<string, number>) => void
+): () => void {
+  if (courtIds.length === 0 || !supabase) return () => {};
+
+  const channel = supabase
+    .channel('court-activity-updates')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'check_ins' },
+      async () => {
+        const activity = await getCourtActivityBatch(courtIds);
+        callback(activity);
+      }
+    )
+    .subscribe();
+
+  return () => { channel.unsubscribe(); };
+}
+
+/**
  * Get IDs of courts that currently have active check-ins
  */
 export async function getActiveCourtsIds(): Promise<string[]> {

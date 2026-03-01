@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
-import { View, Pressable, ScrollView, Animated, useColorScheme } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Link, useLocalSearchParams, useRouter } from "expo-router";
+import { AppState, View, Pressable, ScrollView, Animated, useColorScheme } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Link, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
 import { Text } from "@/src/components/ui/Text";
+import { BasketballRefreshControl } from "@/src/components/BasketballRefreshControl";
 import { Button } from "@/src/components/ui/Button";
 import { PhotoGallery } from "@/src/components/PhotoGallery";
 import { PhotoUpload } from "@/src/components/PhotoUpload";
@@ -25,9 +26,12 @@ import { openDirections } from "@/src/utils/directions";
 import {
   toggleCheckIn,
   isCheckedInAtCourt,
+  getActiveCheckInsCount,
   subscribeToCheckIns,
 } from "@/src/services/checkins";
 import { ReportModal } from "@/src/components/ReportModal";
+import { CourtMapPreview } from "@/src/components/Map/CourtMapPreview";
+import { storeCheckInLocation, clearCheckInLocation } from "@/src/services/autoCheckout";
 
 export default function CourtDetails() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -42,9 +46,9 @@ export default function CourtDetails() {
   const [checkInsCount, setCheckInsCount] = useState(0);
   const [isUserCheckedIn, setIsUserCheckedIn] = useState(false);
   const [checkInLoading, setCheckInLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [photoRefreshKey, setPhotoRefreshKey] = useState(0);
   const [showReportModal, setShowReportModal] = useState(false);
-  const insets = useSafeAreaInsets();
   const supabaseStatus = getSupabaseEnvStatus();
 
   // Pulsing animation for live indicator
@@ -68,6 +72,27 @@ export default function CourtDetails() {
       setLoading(false);
     }
   }, [courtId]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!courtId) return;
+    setRefreshing(true);
+    try {
+      // Fetch silently — don't touch `loading` so the content stays visible
+      // and the RefreshControl spinner remains on screen
+      const fetches: Promise<unknown>[] = [
+        getCourtById(courtId).then((data) => { if (data) setCourt(data); }),
+      ];
+      if (supabaseStatus.configured) {
+        fetches.push(
+          isCheckedInAtCourt(courtId).then(setIsUserCheckedIn),
+          getActiveCheckInsCount(courtId).then(setCheckInsCount),
+        );
+      }
+      await Promise.all(fetches);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [courtId, supabaseStatus.configured]);
 
   const handleGetDirections = useCallback(() => {
     if (!court) return;
@@ -105,8 +130,20 @@ export default function CourtDetails() {
         setIsUserCheckedIn(previousState);
         setCheckInsCount(previousCount);
       } else {
-        // Success haptic
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Store / clear court location for auto-checkout monitoring
+        if (!isUserCheckedIn && court?.latitude != null && court?.longitude != null) {
+          await storeCheckInLocation(courtId, court.latitude, court.longitude);
+        } else {
+          await clearCheckInLocation();
+        }
+        // Confirm actual state from DB — ensures UI is accurate even if realtime is delayed
+        const [actualCheckedIn, actualCount] = await Promise.all([
+          isCheckedInAtCourt(courtId),
+          getActiveCheckInsCount(courtId),
+        ]);
+        setIsUserCheckedIn(actualCheckedIn);
+        setCheckInsCount(actualCount);
       }
     } catch (err) {
       // Revert on error
@@ -116,7 +153,7 @@ export default function CourtDetails() {
     } finally {
       setCheckInLoading(false);
     }
-  }, [courtId, isUserCheckedIn, checkInsCount, checkInLoading]);
+  }, [courtId, isUserCheckedIn, checkInsCount, checkInLoading, court]);
 
   useEffect(() => {
     loadCourt();
@@ -149,6 +186,34 @@ export default function CourtDetails() {
     };
   }, [courtId, supabaseStatus.configured]);
 
+  // Re-sync check-in state whenever this screen comes into focus
+  // (covers: navigating back, tab switches, returning from another court)
+  useFocusEffect(
+    useCallback(() => {
+      if (!courtId || !supabaseStatus.configured) return;
+      Promise.all([
+        isCheckedInAtCourt(courtId),
+        getActiveCheckInsCount(courtId),
+      ]).then(([checkedIn, count]) => {
+        setIsUserCheckedIn(checkedIn);
+        setCheckInsCount(count);
+      });
+    }, [courtId, supabaseStatus.configured])
+  );
+
+  // Re-sync check-in state when app returns to foreground
+  // (auto-checkout may have fired while the app was backgrounded)
+  useEffect(() => {
+    if (!courtId) return;
+    const subscription = AppState.addEventListener("change", async (nextState) => {
+      if (nextState === "active") {
+        const checkedIn = await isCheckedInAtCourt(courtId);
+        setIsUserCheckedIn(checkedIn);
+      }
+    });
+    return () => subscription.remove();
+  }, [courtId]);
+
   // Pulsing animation for live activity indicator
   useEffect(() => {
     if (checkInsCount > 0) {
@@ -172,8 +237,18 @@ export default function CourtDetails() {
   }, [checkInsCount, pulseAnim]);
 
   return (
-    <>
-    <ScrollView className="flex-1 bg-white dark:bg-black">
+    <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+    <ScrollView
+      className="flex-1 bg-white dark:bg-black"
+      alwaysBounceVertical={true}
+      contentContainerStyle={{ flexGrow: 1 }}
+      refreshControl={
+        <BasketballRefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+        />
+      }
+    >
       {!courtId ? (
         <View className="px-6 py-6">
           <Text className="text-2xl font-bold text-gray-900 dark:text-white">Court Details</Text>
@@ -199,9 +274,9 @@ export default function CourtDetails() {
           </View>
         </View>
       ) : court ? (
-        <View className="flex-1">
+        <View>
           {/* Hero Header */}
-          <View className="px-6 pb-4" style={{ paddingTop: insets.top + 4 }}>
+          <View className="px-6 pb-4 pt-4">
             <View className="mb-2 flex-row items-center justify-between">
               <Pressable
                 onPress={() => router.back()}
@@ -238,6 +313,14 @@ export default function CourtDetails() {
                   {court.indoor ? '🏠 Indoor' : '🌤️ Outdoor'}
                 </Text>
               </View>
+
+              {court.court_size != null && (
+                <View className="mr-2 mb-2 rounded-xl bg-gray-200 dark:bg-white/10 px-4 py-2">
+                  <Text className="font-semibold text-gray-900 dark:text-white">
+                    {court.court_size === 'full' ? '⛹️ Full Court' : court.court_size === 'half' ? '½ Half Court' : '⛹️ Full & Half Court'}
+                  </Text>
+                </View>
+              )}
 
               {court.num_hoops != null && (
                 <View className="mr-2 mb-2 rounded-xl bg-gray-200 dark:bg-white/10 px-4 py-2">
@@ -339,6 +422,23 @@ export default function CourtDetails() {
                 </Text>
               </Pressable>
 
+              {typeof court.latitude === 'number' && typeof court.longitude === 'number' && (
+                <Pressable
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(`/(tabs)/map?lat=${court.latitude}&lon=${court.longitude}&courtId=${court.id}`);
+                  }}
+                  className="mr-3 flex-1 items-center py-3"
+                  accessibilityLabel={`Show ${court.name} on map`}
+                  accessibilityRole="button"
+                >
+                  <Ionicons name="map-outline" size={26} color="#960000" />
+                  <Text className="mt-1 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                    Map
+                  </Text>
+                </Pressable>
+              )}
+
               <Pressable
                 onPress={async () => {
                   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -364,6 +464,20 @@ export default function CourtDetails() {
               </Pressable>
             </View>
           </View>
+
+          {/* Map Preview */}
+          {typeof court.latitude === 'number' && typeof court.longitude === 'number' && (
+            <View className="mt-6 px-6">
+              <CourtMapPreview
+                latitude={court.latitude}
+                longitude={court.longitude}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push(`/(tabs)/map?lat=${court.latitude}&lon=${court.longitude}&courtId=${court.id}`);
+                }}
+              />
+            </View>
+          )}
 
           {/* Photo Gallery */}
           {supabaseStatus.configured && courtId && (
@@ -467,6 +581,6 @@ export default function CourtDetails() {
         onClose={() => setShowReportModal(false)}
       />
     )}
-    </>
+    </SafeAreaView>
   );
 }

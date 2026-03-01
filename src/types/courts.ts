@@ -10,6 +10,7 @@ export type Court = {
   country: string | null;
   timezone: string | null;
   indoor: boolean | null;
+  court_size: 'full' | 'half' | 'both' | null;
   surface_type: string | null;
   num_hoops: number | null;
   lighting: boolean | null;

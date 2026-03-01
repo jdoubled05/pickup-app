@@ -10,6 +10,7 @@ export interface CourtFilters {
   maxDistanceMiles: number;
   mustHaveLighting: boolean;
   multipleHoops: boolean;
+  fullCourtOnly: boolean;
   open24Hours: boolean;
   mustBeFree: boolean;
   mustBePublic: boolean;
@@ -17,9 +18,10 @@ export interface CourtFilters {
 
 export const DEFAULT_FILTERS: CourtFilters = {
   courtType: 'both',
-  maxDistanceMiles: 25,
+  maxDistanceMiles: 25, // Default stays at 25 — slider max is now 100
   mustHaveLighting: false,
   multipleHoops: false,
+  fullCourtOnly: false,
   open24Hours: false,
   mustBeFree: false,
   mustBePublic: false,
@@ -85,6 +87,9 @@ export function applyFilters(courts: Court[], filters: CourtFilters): Court[] {
     // Filter by multiple hoops
     if (filters.multipleHoops && (court.num_hoops || 0) < 2) return false;
 
+    // Filter by full court (passes courts marked 'full' or 'both'; excludes 'half' and unknown)
+    if (filters.fullCourtOnly && court.court_size !== 'full' && court.court_size !== 'both') return false;
+
     // Filter by 24 hour access
     if (filters.open24Hours && !court.open_24h) return false;
 
@@ -107,6 +112,7 @@ export function hasActiveFilters(filters: CourtFilters): boolean {
     filters.maxDistanceMiles !== DEFAULT_FILTERS.maxDistanceMiles ||
     filters.mustHaveLighting !== DEFAULT_FILTERS.mustHaveLighting ||
     filters.multipleHoops !== DEFAULT_FILTERS.multipleHoops ||
+    filters.fullCourtOnly !== DEFAULT_FILTERS.fullCourtOnly ||
     filters.open24Hours !== DEFAULT_FILTERS.open24Hours ||
     filters.mustBeFree !== DEFAULT_FILTERS.mustBeFree ||
     filters.mustBePublic !== DEFAULT_FILTERS.mustBePublic

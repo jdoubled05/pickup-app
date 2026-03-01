@@ -37,6 +37,7 @@ export const MOCK_COURTS: Court[] = [
     updated_at: "2024-05-10T18:00:00Z",
     osm_type: null,
     osm_id: null,
+    court_size: null,
   },
   {
     id: "456",
@@ -65,6 +66,7 @@ export const MOCK_COURTS: Court[] = [
     updated_at: "2024-05-08T17:30:00Z",
     osm_type: null,
     osm_id: null,
+    court_size: null,
   },
   {
     id: "789",
@@ -93,6 +95,7 @@ export const MOCK_COURTS: Court[] = [
     updated_at: "2024-05-12T16:45:00Z",
     osm_type: null,
     osm_id: null,
+    court_size: null,
   },
 ];
 

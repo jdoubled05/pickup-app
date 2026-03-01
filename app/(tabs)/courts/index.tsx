@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { Text } from "@/src/components/ui/Text";
 import { SwipeableCourtCard, closeCurrentSwipeable } from "@/src/components/SwipeableCourtCard";
 import { BasketballRefreshControl } from "@/src/components/BasketballRefreshControl";
@@ -13,7 +13,7 @@ import { Court, listCourtsNearby, searchCourts } from "@/src/services/courts";
 import { getForegroundLocationOrDefault } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import { hydrateSavedCourts, subscribeSavedCourts } from "@/src/services/savedCourts";
-import { getCourtActivityBatch } from "@/src/services/courtActivity";
+import { getCourtActivityBatch, subscribeToActivityUpdates } from "@/src/services/courtActivity";
 import { getWeatherForLocation } from "@/src/services/weather";
 import { WeatherData } from "@/src/types/weather";
 import {
@@ -43,10 +43,12 @@ export default function CourtsIndex() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Court[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const supabaseStatus = getSupabaseEnvStatus();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   // Sort courts by distance
   const sortedCourts = useMemo(() => {
@@ -137,6 +139,44 @@ export default function CourtsIndex() {
     return applyFilters(base, filters);
   }, [activeFilter, hotCourts, sortedCourts, savedIds, filters, searchQuery, searchResults]);
 
+  // Suggestions — use global searchResults (no distance limit) when available, else local courts
+  const { citySuggestions, courtSuggestions } = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!searchFocused || q.length < 1) return { citySuggestions: [], courtSuggestions: [] };
+
+    // Prefer the globally-fetched search results so distant courts (e.g. different city) still appear
+    const source = searchResults && searchResults.length > 0 ? searchResults : sortedCourts;
+
+    // Distinct cities matching the query
+    const cityMap = new Map<string, { city: string; state: string | null; count: number }>();
+    for (const c of source) {
+      if (!c.city) continue;
+      const key = `${c.city}|${c.state ?? ''}`;
+      if (c.city.toLowerCase().includes(q) || (c.state ?? '').toLowerCase().includes(q)) {
+        const entry = cityMap.get(key);
+        if (entry) {
+          entry.count += 1;
+        } else {
+          cityMap.set(key, { city: c.city, state: c.state ?? null, count: 1 });
+        }
+      }
+    }
+
+    // Courts matching by name or address
+    const courtMatches = source
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          (c.address ?? '').toLowerCase().includes(q)
+      )
+      .slice(0, 4);
+
+    return {
+      citySuggestions: [...cityMap.values()].slice(0, 2),
+      courtSuggestions: courtMatches,
+    };
+  }, [searchQuery, searchFocused, sortedCourts, searchResults]);
+
   const loadCourts = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
       setRefreshing(true);
@@ -147,7 +187,7 @@ export default function CourtsIndex() {
 
     try {
       const location = await getForegroundLocationOrDefault();
-      const radiusMeters = 50000;
+      const radiusMeters = 161000; // ~100 miles
       const data = await listCourtsNearby(
         location.coords.lat,
         location.coords.lon,
@@ -202,6 +242,14 @@ export default function CourtsIndex() {
     await saveFilters(newFilters);
   }, []);
 
+  // Subscribe to real-time activity updates so the list refreshes when anyone checks in/out
+  useEffect(() => {
+    if (!supabaseStatus.configured || courts.length === 0) return;
+    const courtIds = courts.map((c) => c.id);
+    const unsubscribe = subscribeToActivityUpdates(courtIds, setCourtActivity);
+    return unsubscribe;
+  }, [courts, supabaseStatus.configured]);
+
   // Subscribe to nearby check-ins for notifications
   useEffect(() => {
     if (!supabaseStatus.configured || courts.length === 0) {
@@ -248,7 +296,7 @@ export default function CourtsIndex() {
       </View>
 
       {/* Search Bar */}
-      <View className="px-6 pb-3">
+      <View className="px-6 pb-3" style={{ zIndex: 20 }}>
         <View className="flex-row items-center rounded-2xl border border-gray-200 dark:border-white/20 bg-gray-100 dark:bg-white/5 px-3 py-2">
           <Ionicons
             name="search"
@@ -258,6 +306,8 @@ export default function CourtsIndex() {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder="Search courts..."
             placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
             style={{
@@ -282,6 +332,71 @@ export default function CourtsIndex() {
             </Pressable>
           ) : null}
         </View>
+
+        {/* Instant suggestions dropdown */}
+        {(citySuggestions.length > 0 || courtSuggestions.length > 0) && (
+          <View
+            className="absolute left-6 right-6 overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900"
+            style={{ top: 50, zIndex: 30, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 12, elevation: 8 }}
+          >
+            {/* City rows */}
+            {citySuggestions.map((item, i) => (
+              <Pressable
+                key={`city-${item.city}-${item.state}`}
+                onPress={() => {
+                  setSearchQuery(item.city);
+                  setSearchFocused(false);
+                }}
+                className={`flex-row items-center gap-3 px-4 py-3 ${
+                  i < citySuggestions.length - 1 || courtSuggestions.length > 0
+                    ? 'border-b border-gray-100 dark:border-white/5'
+                    : ''
+                }`}
+              >
+                <Ionicons name="business-outline" size={16} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
+                <View className="flex-1">
+                  <Text className="text-sm font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
+                    {item.city}{item.state ? `, ${item.state}` : ''}
+                  </Text>
+                  <Text className="text-xs text-gray-500 dark:text-white/50">
+                    {item.count} {item.count === 1 ? 'court' : 'courts'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} />
+              </Pressable>
+            ))}
+
+            {/* Court rows */}
+            {courtSuggestions.map((court, i) => {
+              const distMi = court.distance_meters != null
+                ? (court.distance_meters / 1609.34).toFixed(1)
+                : null;
+              return (
+                <Pressable
+                  key={court.id}
+                  onPress={() => {
+                    setSearchFocused(false);
+                    setSearchQuery('');
+                    setSearchResults(null);
+                    router.push(`/court/${court.id}`);
+                  }}
+                  className={`flex-row items-center gap-3 px-4 py-3 ${i < courtSuggestions.length - 1 ? 'border-b border-gray-100 dark:border-white/5' : ''}`}
+                >
+                  <Ionicons name="location-outline" size={16} color="#960000" />
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
+                      {court.name}
+                    </Text>
+                    <Text className="text-xs text-gray-500 dark:text-white/50" numberOfLines={1}>
+                      {[distMi ? `${distMi} mi` : null, court.city, court.state].filter(Boolean).join(' · ')}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={14} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} />
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {/* Filter Chips */}
@@ -451,41 +566,85 @@ export default function CourtsIndex() {
             />
           }
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 4, paddingBottom: 72 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 4, paddingBottom: 32 }}
           onScrollBeginDrag={closeCurrentSwipeable}
           onMomentumScrollBegin={closeCurrentSwipeable}
           ListEmptyComponent={
-            <View className="items-center rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 p-8">
-              <Ionicons
-                name={
-                  searchQuery.trim() ? 'search' :
-                  activeFilter === 'hot' ? 'flame' :
-                  activeFilter === 'saved' ? 'star' : 'location'
-                }
-                size={40}
-                color={
-                  activeFilter === 'saved' && !searchQuery.trim() ? '#FFD700' : '#960000'
-                }
-              />
-              <Text className="mt-4 text-center text-lg font-semibold text-gray-900 dark:text-white">
-                {searchQuery.trim()
-                  ? 'No courts match your search'
-                  : activeFilter === 'hot'
-                    ? 'No active games right now'
-                    : activeFilter === 'saved'
-                      ? 'No saved courts yet'
-                      : 'No courts found'}
-              </Text>
-              <Text className="mt-2 text-center text-gray-600 dark:text-white/60">
-                {searchQuery.trim()
-                  ? 'Try a different name or address'
-                  : activeFilter === 'hot'
-                    ? 'Be the first to check in at a court!'
-                    : activeFilter === 'saved'
-                      ? 'Save courts to quickly find them later'
-                      : 'Try adjusting your location'}
-              </Text>
+            <View className="gap-3">
+              <View className="items-center rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-gray-900 p-8">
+                <Ionicons
+                  name={
+                    searchQuery.trim() ? 'search' :
+                    activeFilter === 'hot' ? 'flame' :
+                    activeFilter === 'saved' ? 'star' : 'location'
+                  }
+                  size={40}
+                  color={
+                    activeFilter === 'saved' && !searchQuery.trim() ? '#FFD700' : '#960000'
+                  }
+                />
+                <Text className="mt-4 text-center text-lg font-semibold text-gray-900 dark:text-white">
+                  {searchQuery.trim()
+                    ? 'No courts match your search'
+                    : activeFilter === 'hot'
+                      ? 'No active games right now'
+                      : activeFilter === 'saved'
+                        ? 'No saved courts yet'
+                        : 'No courts found'}
+                </Text>
+                <Text className="mt-2 text-center text-gray-600 dark:text-white/60">
+                  {searchQuery.trim()
+                    ? 'Try a different name or address'
+                    : activeFilter === 'hot'
+                      ? 'Be the first to check in at a court!'
+                      : activeFilter === 'saved'
+                        ? 'Save courts to quickly find them later'
+                        : 'Try adjusting your location'}
+                </Text>
+              </View>
+
+              {/* Submit court nudge — only shown when a search has no results */}
+              {searchQuery.trim().length >= 2 && !searchLoading && (
+                <Pressable
+                  onPress={() => router.push('/submit-court')}
+                  className="flex-row items-center justify-between rounded-2xl border border-brand/30 bg-brand/10 px-5 py-4"
+                >
+                  <View className="flex-1 flex-row items-center gap-3">
+                    <Ionicons name="add-circle-outline" size={22} color="#960000" />
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-brand dark:text-brand-light">
+                        Know this court?
+                      </Text>
+                      <Text className="text-xs text-gray-500 dark:text-white/50">
+                        Submit it and help the community find it
+                      </Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#960000" />
+                </Pressable>
+              )}
             </View>
+          }
+          ListFooterComponent={
+            filteredCourts.length > 0 ? (
+              <Pressable
+                onPress={() => router.push('/submit-court')}
+                className="mt-3 mb-8 flex-row items-center justify-between rounded-2xl border border-brand/25 bg-brand/8 px-5 py-4"
+              >
+                <View className="flex-row items-center gap-3">
+                  <Ionicons name="add-circle-outline" size={22} color="#960000" />
+                  <View>
+                    <Text className="text-sm font-semibold text-brand dark:text-brand-light">
+                      Know a court we're missing?
+                    </Text>
+                    <Text className="text-xs text-gray-500 dark:text-white/50">
+                      Submit it and help the community
+                    </Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#960000" />
+              </Pressable>
+            ) : null
           }
           renderItem={({ item, index }) => {
             const checkIns = courtActivity.get(item.id) || 0;
