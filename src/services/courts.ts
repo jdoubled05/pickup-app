@@ -243,10 +243,14 @@ export function formatDistance(distance_meters?: number): string | null {
   return `${miles.toFixed(1)} mi`;
 }
 
+function toTitleCase(str: string): string {
+  return str.replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export function formatAddress(court: Court): string {
   const parts = [
     court.address,
-    court.city,
+    court.city ? toTitleCase(court.city) : null,
     court.state,
     court.postal_code,
   ].filter(Boolean);

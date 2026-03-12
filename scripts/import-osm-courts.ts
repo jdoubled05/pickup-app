@@ -388,7 +388,7 @@ function transformOSMToCourt(
     latitude: lat,
     longitude: lon,
     address,
-    city: geocodedAddress?.city || tags['addr:city'] || cityName,
+    city: geocodedAddress?.city || tags['addr:city'] || cityName.replace(/\b\w/g, c => c.toUpperCase()),
     state: geocodedAddress?.state || tags['addr:state'] || state,
     postal_code: geocodedAddress?.postal_code || tags['addr:postcode'] || null,
     country: 'US',
