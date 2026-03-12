@@ -265,9 +265,26 @@ export function formatHours(hours_json: unknown | null): string {
   if (typeof hours_json === "string") {
     return hours_json;
   }
-  try {
-    return JSON.stringify(hours_json);
-  } catch {
+  if (typeof hours_json !== "object") {
     return "Not provided";
   }
+
+  const obj = hours_json as Record<string, unknown>;
+
+  // Google Places format: { weekday_text: ["Monday: 6:00 AM – 10:00 PM", ...] }
+  if (Array.isArray(obj.weekday_text) && obj.weekday_text.length > 0) {
+    return (obj.weekday_text as string[]).join("\n");
+  }
+
+  // OSM format: { raw: "Mo-Fr 08:00-20:00" }
+  if (typeof obj.raw === "string") {
+    return obj.raw;
+  }
+
+  // Simple open/close format: { open: "06:00", close: "22:00" }
+  if (typeof obj.open === "string" && typeof obj.close === "string") {
+    return `${obj.open} – ${obj.close}`;
+  }
+
+  return "Not provided";
 }

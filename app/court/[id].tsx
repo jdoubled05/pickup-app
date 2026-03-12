@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
-import { AppState, View, Pressable, ScrollView, Animated, useColorScheme } from "react-native";
+import { AppState, View, Pressable, ScrollView, Animated, Share, useColorScheme } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -108,6 +108,15 @@ export default function CourtDetails() {
     openDirections(latitude, longitude, name);
   }, [court]);
 
+  const handleShare = useCallback(async () => {
+    if (!court) return;
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const message = court.address
+      ? `Check out ${court.name} — ${court.address}, ${court.city ?? ''}`
+      : `Check out ${court.name} on Pickup`;
+    await Share.share({ message });
+  }, [court]);
+
   const handleToggleCheckIn = useCallback(async () => {
     if (!courtId || checkInLoading) return;
 
@@ -149,7 +158,7 @@ export default function CourtDetails() {
       // Revert on error
       setIsUserCheckedIn(previousState);
       setCheckInsCount(previousCount);
-      console.error("Failed to toggle check-in:", err);
+      if (__DEV__) console.error("Failed to toggle check-in:", err);
     } finally {
       setCheckInLoading(false);
     }
@@ -438,6 +447,18 @@ export default function CourtDetails() {
                   </Text>
                 </Pressable>
               )}
+
+              <Pressable
+                onPress={handleShare}
+                className="mr-3 flex-1 items-center py-3"
+                accessibilityLabel={`Share ${court.name}`}
+                accessibilityRole="button"
+              >
+                <Ionicons name="share-outline" size={26} color="#960000" />
+                <Text className="mt-1 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                  Share
+                </Text>
+              </Pressable>
 
               <Pressable
                 onPress={async () => {

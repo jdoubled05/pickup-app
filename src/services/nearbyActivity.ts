@@ -75,7 +75,7 @@ export function subscribeToNearbyCheckIns(
 
   const courtIds = nearbyCourts.map((c) => c.id);
 
-  console.log('[NearbyActivity] Subscribing to check-ins for', courtIds.length, 'courts');
+  if (__DEV__) console.log('[NearbyActivity] Subscribing to check-ins for', courtIds.length, 'courts');
 
   const channel = supabase
     .channel('nearby-checkins')
@@ -112,7 +112,7 @@ export function subscribeToNearbyCheckIns(
 
         // Check if we should notify
         if (shouldNotify(courtId, count)) {
-          console.log('[NearbyActivity] Showing notification for', court.name, 'with', count, 'players');
+          if (__DEV__) console.log('[NearbyActivity] Showing notification for', court.name, 'with', count, 'players');
           await showCheckInNotification(court, count);
           recordNotification(courtId);
         }
@@ -121,7 +121,7 @@ export function subscribeToNearbyCheckIns(
     .subscribe();
 
   return () => {
-    console.log('[NearbyActivity] Unsubscribing from nearby check-ins');
+    if (__DEV__) console.log('[NearbyActivity] Unsubscribing from nearby check-ins');
     channel.unsubscribe();
   };
 }

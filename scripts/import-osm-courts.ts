@@ -95,25 +95,26 @@ interface OSMResponse {
 interface Court {
   id: string;
   name: string;
+  latitude: number;
+  longitude: number;
   address: string | null;
   city: string | null;
   state: string | null;
   postal_code: string | null;
   country: string;
   timezone: string;
-  latitude: number;
-  longitude: number;
-  indoor: boolean; // Required by database, defaults to false (outdoor)
+  indoor: boolean;
   surface_type: string | null;
   num_hoops: number | null;
   lighting: boolean | null;
   open_24h: boolean | null;
   is_free: boolean | null;
   is_public: boolean | null;
-  hours_json: any;
-  amenities_json: any;
+  hours_json: unknown;
+  amenities_json: unknown;
   osm_type: string;
   osm_id: number;
+  source: string;
   photos_count: number;
 }
 
@@ -279,10 +280,10 @@ function transformOSMToCourt(
   const tags = element.tags || {};
 
   // Get coordinates (nodes have lat/lon directly, ways/relations have center)
-  const lat = element.lat || element.center?.lat;
-  const lon = element.lon || element.center?.lon;
+  const lat = element.lat ?? element.center?.lat;
+  const lon = element.lon ?? element.center?.lon;
 
-  if (!lat || !lon) {
+  if (lat == null || lon == null) {
     throw new Error(`Missing coordinates for OSM ${element.type} ${element.id}`);
   }
 
@@ -384,14 +385,14 @@ function transformOSMToCourt(
   return {
     id,
     name,
+    latitude: lat,
+    longitude: lon,
     address,
     city: geocodedAddress?.city || tags['addr:city'] || cityName,
     state: geocodedAddress?.state || tags['addr:state'] || state,
     postal_code: geocodedAddress?.postal_code || tags['addr:postcode'] || null,
-    country: 'United States',
-    timezone: 'America/New_York', // TODO: Infer from coordinates
-    latitude: lat,
-    longitude: lon,
+    country: 'US',
+    timezone: 'America/New_York',
     indoor,
     surface_type: surface,
     num_hoops: numHoops,
@@ -403,6 +404,7 @@ function transformOSMToCourt(
     amenities_json: amenities.length > 0 ? amenities : null,
     osm_type: element.type,
     osm_id: element.id,
+    source: 'osm',
     photos_count: 0,
   };
 }

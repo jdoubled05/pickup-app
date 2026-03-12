@@ -48,6 +48,13 @@ const SLIDES: Slide[] = [
     body: "Our database grows with your help. Submit a court directly from the app — it only takes a minute.",
   },
   {
+    id: "access",
+    icon: "shield-checkmark",
+    iconColor: "#FF7043",
+    title: "Not All Courts Are Public",
+    body: "Some courts — especially indoor gyms and rec centers — may require a membership or fee. Help the community by reporting access info when you visit.",
+  },
+  {
     id: "location",
     icon: "location",
     iconColor: "#00BCD4",
@@ -187,6 +194,18 @@ function SlideView({ slide, topInset }: { slide: Slide; topInset: number }) {
             <Ionicons name="people" size={18} color="#FFD700" />
             <Text className="flex-1 text-sm text-vibrant-gold/90">
               Submissions are reviewed and added within 24 hours.
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {/* Extra nudge on the access slide */}
+      {slide.id === "access" && (
+        <View className="mt-8 w-full rounded-2xl border border-orange-500/20 bg-orange-500/10 px-5 py-4">
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="flag" size={18} color="#FF7043" />
+            <Text className="flex-1 text-sm text-orange-300/90">
+              On any court page, tap "Report an Issue" to mark it as free/paid or public/private.
             </Text>
           </View>
         </View>

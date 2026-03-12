@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "import-courts": "tsx scripts/import-osm-courts.ts",
+    "import-google-courts": "tsx scripts/import-google-courts.ts",
     "import-manual-courts": "tsx scripts/import-manual-courts.ts",
     "review-courts": "tsx scripts/review-courts.ts",
     "seed-data": "tsx scripts/seed-test-data.ts",
