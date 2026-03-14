@@ -440,7 +440,7 @@ export default function MapsTest() {
                   onPress={() => {
                     Keyboard.dismiss();
                     setSearchFocused(false);
-                    setSearchText(city.city);
+                    setSearchText(city.state ? `${city.city}, ${city.state}` : city.city);
                     const coords = { lat: city.lat, lon: city.lon };
                     setCenter(coords);
                     skipRegionFetchRef.current += 1;
