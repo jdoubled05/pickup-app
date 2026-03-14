@@ -473,7 +473,7 @@ export default function MapsTest() {
                 onPress={() => {
                   Keyboard.dismiss();
                   setSearchFocused(false);
-                  setSearchText('');
+                  setSearchText(court.name);
                   if (typeof court.latitude === 'number' && typeof court.longitude === 'number') {
                     const coords = { lat: court.latitude, lon: court.longitude };
                     setCenter(coords);
