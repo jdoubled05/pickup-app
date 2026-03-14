@@ -40,6 +40,8 @@ export function CourtsMap({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
   const mapRef = useRef<MapView>(null);
+  const centerRef = useRef(center);
+  useEffect(() => { centerRef.current = center; }, [center]);
   const [region, setRegion] = useState<Region>({
     latitude: center.lat,
     longitude: center.lon,
@@ -105,15 +107,15 @@ export function CourtsMap({
     if (typeof recenterSignal === "number" && recenterSignal > 0) {
       mapRef.current?.animateToRegion(
         {
-          latitude: center.lat,
-          longitude: center.lon,
+          latitude: centerRef.current.lat,
+          longitude: centerRef.current.lon,
           latitudeDelta: 0.1,
           longitudeDelta: 0.1,
         },
         600
       );
     }
-  }, [recenterSignal, center.lat, center.lon]);
+  }, [recenterSignal]);
 
   const handleMarkerPress = useCallback(
     (courtId: string) => {
