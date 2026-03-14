@@ -263,7 +263,7 @@ export default function MapsTest() {
     const timer = setTimeout(async () => {
       const results = await autocompleteCities(q);
       setCitySuggestions(results);
-    }, 400);
+    }, 500);
     return () => clearTimeout(timer);
   }, [searchText, searchFocused]);
 
@@ -304,10 +304,11 @@ export default function MapsTest() {
     return results.slice(0, 3);
   }, [searchText, searchFocused, courts, suggestionResults]);
 
-  // Combined: DB cities first (instant), Nominatim fills remaining slots
+  // Combined: DB cities first (instant), Nominatim fills slots for cities not in DB
+  // Dedup by base city name so "Duluth, MN" is excluded if DB has "Duluth, GA"
   const combinedCitySuggestions = React.useMemo((): CitySuggestion[] => {
-    const dbKeys = new Set(dbCitySuggestions.map((c) => c.displayName.toLowerCase()));
-    const extra = citySuggestions.filter((c) => !dbKeys.has(c.displayName.toLowerCase()));
+    const dbBaseNames = new Set(dbCitySuggestions.map((c) => c.displayName.split(',')[0].trim().toLowerCase()));
+    const extra = citySuggestions.filter((c) => !dbBaseNames.has(c.displayName.split(',')[0].trim().toLowerCase()));
     return [...dbCitySuggestions, ...extra].slice(0, 3);
   }, [dbCitySuggestions, citySuggestions]);
 
