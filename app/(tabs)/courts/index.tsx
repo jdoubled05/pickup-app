@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Image, Pressable, TextInput, View, ScrollView, useColorScheme } from "react-native";
+import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, TextInput, View, ScrollView, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -277,7 +277,7 @@ export default function CourtsIndex() {
     <GestureHandlerRootView className="flex-1">
       <View className="flex-1 bg-white dark:bg-black">
       {/* Header */}
-      <View className="px-6 pb-4" style={{ paddingTop: insets.top + 8 }}>
+      <Pressable onPress={Keyboard.dismiss} className="px-6 pb-4" style={{ paddingTop: insets.top + 8 }}>
         <View className="flex-row items-center justify-center">
           <Image
             source={isDark
@@ -296,7 +296,7 @@ export default function CourtsIndex() {
             </View>
           )}
         </View>
-      </View>
+      </Pressable>
 
       {/* Search Bar */}
       <View className="px-6 pb-3" style={{ zIndex: 20 }}>
