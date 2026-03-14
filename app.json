@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "pickup.",
-    "slug": "pickup",
+    "slug": "pickup-nativewind-clean",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
