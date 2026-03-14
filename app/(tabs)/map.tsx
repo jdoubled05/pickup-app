@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { ActivityIndicator, Keyboard, Pressable, TextInput, View, useColorScheme } from "react-native";
+import { ActivityIndicator, Pressable, TextInput, View, useColorScheme } from "react-native";
 import { Region } from "react-native-maps";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -89,6 +89,7 @@ export default function MapsTest() {
   const [mapRefreshing, setMapRefreshing] = React.useState(false);
   const [filters, setFilters] = React.useState<CourtFilters>(DEFAULT_FILTERS);
   const [filterModalVisible, setFilterModalVisible] = React.useState(false);
+  const searchInputRef = useRef<TextInput>(null);
   const regionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks programmatic region changes (recenter/search) to skip auto-fetch
   const skipRegionFetchRef = useRef(0);
@@ -321,7 +322,7 @@ export default function MapsTest() {
         <Pressable
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
           onPress={() => {
-            Keyboard.dismiss();
+            searchInputRef.current?.blur();
             setSearchFocused(false);
           }}
         />
@@ -352,6 +353,7 @@ export default function MapsTest() {
               color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
             />
             <TextInput
+              ref={searchInputRef}
               value={searchText}
               onChangeText={setSearchText}
               onFocus={() => setSearchFocused(true)}
@@ -438,7 +440,7 @@ export default function MapsTest() {
                 <Pressable
                   key={`city-${city.city}-${city.state}`}
                   onPress={() => {
-                    Keyboard.dismiss();
+                    searchInputRef.current?.blur();
                     setSearchFocused(false);
                     setSearchText(city.state ? `${city.city}, ${city.state}` : city.city);
                     const coords = { lat: city.lat, lon: city.lon };
@@ -471,7 +473,7 @@ export default function MapsTest() {
               <Pressable
                 key={court.id}
                 onPress={() => {
-                  Keyboard.dismiss();
+                  searchInputRef.current?.blur();
                   setSearchFocused(false);
                   setSearchText(court.name);
                   if (typeof court.latitude === 'number' && typeof court.longitude === 'number') {
