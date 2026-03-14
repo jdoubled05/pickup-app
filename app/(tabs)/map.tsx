@@ -92,6 +92,8 @@ export default function MapsTest() {
   const regionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks programmatic region changes (recenter/search) to skip auto-fetch
   const skipRegionFetchRef = useRef(0);
+  // Tracks current viewport center for manual refresh without causing re-renders
+  const viewportCenterRef = useRef(center);
 
   const fetchCourts = React.useCallback(async (coords: { lat: number; lon: number }) => {
     const data = await listCourtsNearby(coords.lat, coords.lon, 50000);
@@ -199,7 +201,7 @@ export default function MapsTest() {
     }
     regionDebounceRef.current = setTimeout(async () => {
       const coords = { lat: region.latitude, lon: region.longitude };
-      setCenter(coords);
+      viewportCenterRef.current = coords;
       setMapRefreshing(true);
       try {
         await fetchCourts(coords);
@@ -550,7 +552,7 @@ export default function MapsTest() {
               setLoading(true);
               setError(null);
               try {
-                await fetchCourts(center);
+                await fetchCourts(viewportCenterRef.current);
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to load courts.");
               } finally {

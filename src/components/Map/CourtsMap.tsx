@@ -93,15 +93,6 @@ export function CourtsMap({
     return supercluster.getClusters(bbox, zoom);
   }, [supercluster, region]);
 
-  // Recenter when center prop changes
-  useEffect(() => {
-    setRegion((prev) => ({
-      ...prev,
-      latitude: center.lat,
-      longitude: center.lon,
-    }));
-  }, [center.lat, center.lon]);
-
   // Animate to device location on recenter signal
   useEffect(() => {
     if (typeof recenterSignal === "number" && recenterSignal > 0) {
