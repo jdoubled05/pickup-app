@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, TextInput, View, ScrollView, useColorScheme } from "react-native";
+import { ActivityIndicator, FlatList, Image, Pressable, TextInput, View, ScrollView, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -279,10 +279,14 @@ export default function CourtsIndex() {
       {/* Header */}
       <View className="px-6 pb-4" style={{ paddingTop: insets.top + 8 }}>
         <View className="flex-row items-center justify-between">
-          <View>
-            <Text className="text-4xl font-extrabold text-gray-900 dark:text-white">PICKUP</Text>
-            <View className="mt-1 h-1 w-16 rounded-full bg-brand" />
-          </View>
+          <Image
+            source={isDark
+              ? require('@/assets/images/splash-icon-dark.png')
+              : require('@/assets/images/splash-icon.png')
+            }
+            style={{ height: 36, width: undefined, aspectRatio: 3 }}
+            resizeMode="contain"
+          />
           {hotCourts.length > 0 && (
             <View className="flex-row items-center rounded-full bg-brand/20 px-4 py-2">
               <View className="mr-2 h-2 w-2 animate-pulse rounded-full bg-brand" />
