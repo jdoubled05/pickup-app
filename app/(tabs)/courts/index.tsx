@@ -103,6 +103,7 @@ export default function CourtsIndex() {
     const trimmed = searchQuery.trim();
     if (trimmed.length < 2) {
       setSearchResults(null);
+      setSearchLoading(false);
       return;
     }
     setSearchLoading(true);
@@ -113,6 +114,7 @@ export default function CourtsIndex() {
     }, 400);
     return () => {
       clearTimeout(timer);
+      setSearchLoading(false);
     };
   }, [searchQuery]);
 

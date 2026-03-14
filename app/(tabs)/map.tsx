@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { ActivityIndicator, Pressable, TextInput, View, useColorScheme } from "react-native";
+import { ActivityIndicator, Keyboard, Pressable, TextInput, View, useColorScheme } from "react-native";
 import { Region } from "react-native-maps";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -313,6 +313,17 @@ export default function MapsTest() {
           onRegionChangeComplete={handleMapRegionChangeComplete}
         />
       </MapErrorBoundary>
+
+      {/* Tap-outside overlay — dismisses keyboard when search is focused */}
+      {searchFocused && (
+        <Pressable
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          onPress={() => {
+            Keyboard.dismiss();
+            setSearchFocused(false);
+          }}
+        />
+      )}
 
       {/* Location search bar */}
       <View
