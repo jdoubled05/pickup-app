@@ -284,7 +284,7 @@ export default function CourtsIndex() {
               ? require('@/assets/images/splash-icon-dark.png')
               : require('@/assets/images/splash-icon.png')
             }
-            style={{ height: 36, width: undefined, aspectRatio: 3 }}
+            style={{ height: 42, width: undefined, aspectRatio: 3 }}
             resizeMode="contain"
           />
           {hotCourts.length > 0 && (
@@ -296,9 +296,6 @@ export default function CourtsIndex() {
             </View>
           )}
         </View>
-        <Text className="mt-2 text-base text-gray-500 dark:text-white/60">
-          Find your next game 🏀
-        </Text>
       </View>
 
       {/* Search Bar */}
