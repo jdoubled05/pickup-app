@@ -15,6 +15,7 @@ import {
   geocodeAddress,
   autocompleteCities,
   CitySuggestion,
+  STATE_ABBREVS,
 } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import { getCourtActivityBatch, subscribeToActivityUpdates } from "@/src/services/courtActivity";
@@ -252,7 +253,7 @@ export default function MapsTest() {
     }
   }, [searchText, fetchCourts]);
 
-  // Debounced city autocomplete via Nominatim
+  // Debounced city autocomplete via Nominatim (supplements DB results)
   React.useEffect(() => {
     const q = searchText.trim();
     if (!searchFocused || q.length < 1) {
@@ -262,11 +263,11 @@ export default function MapsTest() {
     const timer = setTimeout(async () => {
       const results = await autocompleteCities(q);
       setCitySuggestions(results);
-    }, 300);
+    }, 400);
     return () => clearTimeout(timer);
   }, [searchText, searchFocused]);
 
-  // Debounced global court search for suggestions (no distance filter)
+  // Debounced global court search for name/address suggestions
   React.useEffect(() => {
     const q = searchText.trim();
     if (!searchFocused || q.length < 1) {
@@ -279,6 +280,36 @@ export default function MapsTest() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchText, searchFocused]);
+
+  // Instant city matches from courts already in memory (prioritized — have courts data)
+  const dbCitySuggestions = React.useMemo((): CitySuggestion[] => {
+    const q = searchText.trim().toLowerCase();
+    if (!searchFocused || q.length < 1) return [];
+    const source = suggestionResults && suggestionResults.length > 0
+      ? [...suggestionResults, ...courts]
+      : courts;
+    const seen = new Set<string>();
+    const results: CitySuggestion[] = [];
+    for (const c of source) {
+      if (!c.city || typeof c.latitude !== 'number' || typeof c.longitude !== 'number') continue;
+      if (!c.city.toLowerCase().includes(q)) continue;
+      const key = c.city.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const stateRaw = c.state ?? '';
+      const stateAbbrev = STATE_ABBREVS[stateRaw.toLowerCase()] ?? stateRaw;
+      const displayName = stateAbbrev ? `${c.city}, ${stateAbbrev}` : c.city;
+      results.push({ displayName, description: displayName, coords: { lat: c.latitude, lon: c.longitude } });
+    }
+    return results.slice(0, 3);
+  }, [searchText, searchFocused, courts, suggestionResults]);
+
+  // Combined: DB cities first (instant), Nominatim fills remaining slots
+  const combinedCitySuggestions = React.useMemo((): CitySuggestion[] => {
+    const dbKeys = new Set(dbCitySuggestions.map((c) => c.displayName.toLowerCase()));
+    const extra = citySuggestions.filter((c) => !dbKeys.has(c.displayName.toLowerCase()));
+    return [...dbCitySuggestions, ...extra].slice(0, 3);
+  }, [dbCitySuggestions, citySuggestions]);
 
   // Court name/address matches from DB
   const mapCourtSuggestions = React.useMemo(() => {
@@ -415,7 +446,7 @@ export default function MapsTest() {
         </View>
 
         {/* Suggestions dropdown — cities then courts */}
-        {(citySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
+        {(combinedCitySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
           <View
             style={{
               marginTop: 6,
@@ -431,8 +462,8 @@ export default function MapsTest() {
               elevation: 8,
             }}
           >
-            {citySuggestions.map((city, i) => {
-              const isLast = i === citySuggestions.length - 1 && mapCourtSuggestions.length === 0;
+            {combinedCitySuggestions.map((city, i) => {
+              const isLast = i === combinedCitySuggestions.length - 1 && mapCourtSuggestions.length === 0;
               return (
                 <Pressable
                   key={`city-${city.displayName}`}
