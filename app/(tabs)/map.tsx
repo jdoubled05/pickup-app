@@ -436,6 +436,7 @@ export default function MapsTest() {
                 <Pressable
                   key={`city-${city.city}-${city.state}`}
                   onPress={() => {
+                    Keyboard.dismiss();
                     setSearchFocused(false);
                     setSearchText(city.city);
                     const coords = { lat: city.lat, lon: city.lon };
@@ -468,6 +469,7 @@ export default function MapsTest() {
               <Pressable
                 key={court.id}
                 onPress={() => {
+                  Keyboard.dismiss();
                   setSearchFocused(false);
                   setSearchText('');
                   if (typeof court.latitude === 'number' && typeof court.longitude === 'number') {
