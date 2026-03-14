@@ -13,6 +13,8 @@ import {
   DEFAULT_CENTER,
   getForegroundLocationOrDefault,
   geocodeAddress,
+  autocompleteCities,
+  CitySuggestion,
 } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import { getCourtActivityBatch, subscribeToActivityUpdates } from "@/src/services/courtActivity";
@@ -86,6 +88,7 @@ export default function MapsTest() {
   const [searchLoading, setSearchLoading] = React.useState(false);
   const [searchFocused, setSearchFocused] = React.useState(false);
   const [suggestionResults, setSuggestionResults] = React.useState<Court[] | null>(null);
+  const [citySuggestions, setCitySuggestions] = React.useState<CitySuggestion[]>([]);
   const [mapRefreshing, setMapRefreshing] = React.useState(false);
   const [filters, setFilters] = React.useState<CourtFilters>(DEFAULT_FILTERS);
   const [filterModalVisible, setFilterModalVisible] = React.useState(false);
@@ -249,6 +252,20 @@ export default function MapsTest() {
     }
   }, [searchText, fetchCourts]);
 
+  // Debounced city autocomplete via Nominatim
+  React.useEffect(() => {
+    const q = searchText.trim();
+    if (!searchFocused || q.length < 1) {
+      setCitySuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const results = await autocompleteCities(q);
+      setCitySuggestions(results);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchText, searchFocused]);
+
   // Debounced global court search for suggestions (no distance filter)
   React.useEffect(() => {
     const q = searchText.trim();
@@ -259,49 +276,18 @@ export default function MapsTest() {
     const timer = setTimeout(async () => {
       const results = await searchCourts(q);
       setSuggestionResults(results);
-    }, 250);
+    }, 300);
     return () => clearTimeout(timer);
   }, [searchText, searchFocused]);
 
-  // Suggestions — use global search results (no distance limit) when available, else viewport courts
-  const { mapCitySuggestions, mapCourtSuggestions } = React.useMemo(() => {
+  // Court name/address matches from DB
+  const mapCourtSuggestions = React.useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    if (!searchFocused || q.length < 1) return { mapCitySuggestions: [], mapCourtSuggestions: [] };
-
+    if (!searchFocused || q.length < 1) return [];
     const source = suggestionResults && suggestionResults.length > 0 ? suggestionResults : courts;
-
-    const cityMap = new Map<string, { city: string; state: string | null; lat: number; lon: number }>();
-    for (const c of source) {
-      if (!c.city || typeof c.latitude !== 'number' || typeof c.longitude !== 'number') continue;
-      // Dedup by city name only (case-insensitive) to avoid "GA" vs "Georgia" duplicates
-      const key = c.city.toLowerCase();
-      const matches = c.city.toLowerCase().includes(q) || (c.state ?? '').toLowerCase().includes(q);
-      if (!matches) continue;
-      if (!cityMap.has(key)) {
-        cityMap.set(key, { city: c.city, state: c.state ?? null, lat: c.latitude, lon: c.longitude });
-      } else {
-        // Prefer short state abbreviation (e.g. "GA" over "Georgia") for display
-        const existing = cityMap.get(key)!;
-        const existingStateLen = (existing.state ?? '').length;
-        const newStateLen = (c.state ?? '').length;
-        if (newStateLen > 0 && newStateLen < existingStateLen) {
-          cityMap.set(key, { city: c.city, state: c.state ?? null, lat: c.latitude, lon: c.longitude });
-        }
-      }
-    }
-
-    const courtMatches = source
-      .filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          (c.address ?? '').toLowerCase().includes(q)
-      )
+    return source
+      .filter((c) => c.name.toLowerCase().includes(q) || (c.address ?? '').toLowerCase().includes(q))
       .slice(0, 4);
-
-    return {
-      mapCitySuggestions: [...cityMap.values()].slice(0, 2),
-      mapCourtSuggestions: courtMatches,
-    };
   }, [searchText, searchFocused, courts, suggestionResults]);
 
   const mappableCourts = React.useMemo(() => {
@@ -368,7 +354,7 @@ export default function MapsTest() {
               value={searchText}
               onChangeText={setSearchText}
               onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
               onSubmitEditing={handleLocationSearch}
               placeholder="Search courts or a location..."
               placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
@@ -429,7 +415,7 @@ export default function MapsTest() {
         </View>
 
         {/* Suggestions dropdown — cities then courts */}
-        {(mapCitySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
+        {(citySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
           <View
             style={{
               marginTop: 6,
@@ -445,20 +431,19 @@ export default function MapsTest() {
               elevation: 8,
             }}
           >
-            {mapCitySuggestions.map((city, i) => {
-              const isLast = i === mapCitySuggestions.length - 1 && mapCourtSuggestions.length === 0;
+            {citySuggestions.map((city, i) => {
+              const isLast = i === citySuggestions.length - 1 && mapCourtSuggestions.length === 0;
               return (
                 <Pressable
-                  key={`city-${city.city}-${city.state}`}
+                  key={`city-${city.displayName}`}
                   onPress={() => {
-                    setSearchText(city.state ? `${city.city}, ${city.state}` : city.city);
+                    setSearchText(city.displayName);
                     setSearchFocused(false);
                     searchInputRef.current?.blur();
-                    const coords = { lat: city.lat, lon: city.lon };
-                    setCenter(coords);
+                    setCenter(city.coords);
                     skipRegionFetchRef.current += 1;
                     setRecenterSignal((v) => v + 1);
-                    fetchCourts(coords);
+                    fetchCourts(city.coords);
                   }}
                   style={{
                     flexDirection: 'row',
@@ -473,7 +458,7 @@ export default function MapsTest() {
                   <Ionicons name="business-outline" size={16} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)'} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#fff' : '#111' }} numberOfLines={1}>
-                      {city.city}{city.state ? `, ${city.state}` : ''}
+                      {city.displayName}
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={14} color={isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)'} />
