@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Switch, useColorScheme } from "react-native";
+import { View, Switch, Pressable, Linking, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import Constants from "expo-constants";
@@ -21,10 +21,7 @@ export default function ProfileScreen() {
   const isDark = colorScheme === 'dark';
   const iconColor = isDark ? '#ffffff' : '#1f2937';
   const insets = useSafeAreaInsets(); // white in dark mode, gray-800 in light mode
-  const version =
-    Constants.expoConfig?.version ??
-    Constants.manifest?.version ??
-    "Unknown";
+  const version = Constants.expoConfig?.version ?? "Unknown";
   const build =
     Constants.expoConfig?.ios?.buildNumber ??
     Constants.expoConfig?.android?.versionCode?.toString() ??
@@ -129,6 +126,46 @@ export default function ProfileScreen() {
             accessibilityRole="button"
           />
         </Link>
+      </View>
+
+      {/* Legal */}
+      <View className="mt-6 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 overflow-hidden">
+        <Pressable
+          onPress={() => Linking.openURL('https://privacy.runpickup.com/')}
+          className="flex-row items-center justify-between px-4 py-3.5 border-b border-gray-200 dark:border-white/10"
+          accessibilityLabel="View Privacy Policy"
+          accessibilityRole="link"
+        >
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="shield-checkmark-outline" size={18} color={isDark ? '#ffffff99' : '#374151'} />
+            <Text className="text-gray-700 dark:text-white/80">Privacy Policy</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={isDark ? '#ffffff40' : '#9ca3af'} />
+        </Pressable>
+        <Pressable
+          onPress={() => Linking.openURL('https://privacy.runpickup.com/terms')}
+          className="flex-row items-center justify-between px-4 py-3.5 border-b border-gray-200 dark:border-white/10"
+          accessibilityLabel="View Terms of Service"
+          accessibilityRole="link"
+        >
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="document-text-outline" size={18} color={isDark ? '#ffffff99' : '#374151'} />
+            <Text className="text-gray-700 dark:text-white/80">Terms of Service</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={isDark ? '#ffffff40' : '#9ca3af'} />
+        </Pressable>
+        <Pressable
+          onPress={() => Linking.openURL('mailto:support@runpickup.com').catch(() => null)}
+          className="flex-row items-center justify-between px-4 py-3.5"
+          accessibilityLabel="Contact Support"
+          accessibilityRole="link"
+        >
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="mail-outline" size={18} color={isDark ? '#ffffff99' : '#374151'} />
+            <Text className="text-gray-700 dark:text-white/80">Contact Support</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={isDark ? '#ffffff40' : '#9ca3af'} />
+        </Pressable>
       </View>
     </View>
   );

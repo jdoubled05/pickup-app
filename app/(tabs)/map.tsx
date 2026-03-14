@@ -16,6 +16,15 @@ import {
 } from "@/src/services/location";
 import { getSupabaseEnvStatus } from "@/src/services/supabase";
 import { getCourtActivityBatch, subscribeToActivityUpdates } from "@/src/services/courtActivity";
+import { FilterModal } from "@/src/components/FilterModal";
+import {
+  CourtFilters,
+  DEFAULT_FILTERS,
+  applyFilters,
+  hasActiveFilters,
+  loadFilters,
+  saveFilters,
+} from "@/src/services/courtFilters";
 
 type MapErrorBoundaryProps = {
   children: React.ReactNode;
@@ -78,6 +87,8 @@ export default function MapsTest() {
   const [searchFocused, setSearchFocused] = React.useState(false);
   const [suggestionResults, setSuggestionResults] = React.useState<Court[] | null>(null);
   const [mapRefreshing, setMapRefreshing] = React.useState(false);
+  const [filters, setFilters] = React.useState<CourtFilters>(DEFAULT_FILTERS);
+  const [filterModalVisible, setFilterModalVisible] = React.useState(false);
   const regionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks programmatic region changes (recenter/search) to skip auto-fetch
   const skipRegionFetchRef = useRef(0);
@@ -145,6 +156,11 @@ export default function MapsTest() {
       isMounted = false;
     };
   }, [loadCourts]);
+
+  // Load saved filters on mount
+  React.useEffect(() => {
+    loadFilters().then(setFilters);
+  }, []);
 
   // Auto-select the focused court once courts have loaded
   React.useEffect(() => {
@@ -274,17 +290,16 @@ export default function MapsTest() {
     };
   }, [searchText, searchFocused, courts, suggestionResults]);
 
-  const mappableCourts = React.useMemo(
-    () =>
-      courts.filter(
-        (court) =>
-          typeof court.latitude === "number" &&
-          typeof court.longitude === "number" &&
-          Number.isFinite(court.latitude) &&
-          Number.isFinite(court.longitude)
-      ),
-    [courts]
-  );
+  const mappableCourts = React.useMemo(() => {
+    const filtered = applyFilters(courts, filters);
+    return filtered.filter(
+      (court) =>
+        typeof court.latitude === "number" &&
+        typeof court.longitude === "number" &&
+        Number.isFinite(court.latitude) &&
+        Number.isFinite(court.longitude)
+    );
+  }, [courts, filters]);
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
@@ -304,53 +319,87 @@ export default function MapsTest() {
         className="absolute left-0 right-0 px-4"
         style={{ top: insets.top + 12 }}
       >
-        <View
-          className="flex-row items-center rounded-2xl px-3 py-2.5"
-          style={{
-            backgroundColor: isDark ? 'rgba(20,20,20,0.92)' : 'rgba(255,255,255,0.95)',
-            borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.15,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-        >
-          <Ionicons
-            name="search"
-            size={16}
-            color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
-          />
-          <TextInput
-            value={searchText}
-            onChangeText={setSearchText}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            onSubmitEditing={handleLocationSearch}
-            placeholder="Search courts or a location..."
-            placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
+        <View className="flex-row items-center gap-2">
+          <View
+            className="flex-1 flex-row items-center rounded-2xl px-3 py-2.5"
             style={{
-              flex: 1,
-              marginLeft: 8,
-              fontSize: 15,
-              color: isDark ? '#fff' : '#111',
+              backgroundColor: isDark ? 'rgba(20,20,20,0.92)' : 'rgba(255,255,255,0.95)',
+              borderWidth: 1,
+              borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 4,
             }}
-            returnKeyType="search"
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
-          {searchLoading ? (
-            <ActivityIndicator size="small" color={isDark ? '#fff' : '#960000'} />
-          ) : searchText.length > 0 ? (
-            <Pressable onPress={() => setSearchText('')} hitSlop={8}>
-              <Ionicons
-                name="close-circle"
-                size={16}
-                color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
-              />
-            </Pressable>
-          ) : null}
+          >
+            <Ionicons
+              name="search"
+              size={16}
+              color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
+            />
+            <TextInput
+              value={searchText}
+              onChangeText={setSearchText}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
+              onSubmitEditing={handleLocationSearch}
+              placeholder="Search courts or a location..."
+              placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
+              style={{
+                flex: 1,
+                marginLeft: 8,
+                fontSize: 15,
+                color: isDark ? '#fff' : '#111',
+              }}
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
+            {searchLoading ? (
+              <ActivityIndicator size="small" color={isDark ? '#fff' : '#960000'} />
+            ) : searchText.length > 0 ? (
+              <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+                <Ionicons
+                  name="close-circle"
+                  size={16}
+                  color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'}
+                />
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Filter button */}
+          <Pressable
+            onPress={() => setFilterModalVisible(true)}
+            accessibilityLabel={hasActiveFilters(filters) ? 'Open filters, filters active' : 'Open filters'}
+            accessibilityRole="button"
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: hasActiveFilters(filters)
+                ? '#960000'
+                : (isDark ? 'rgba(20,20,20,0.92)' : 'rgba(255,255,255,0.95)'),
+              borderWidth: 1,
+              borderColor: hasActiveFilters(filters)
+                ? '#960000'
+                : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)'),
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
+          >
+            <Ionicons
+              name="options-outline"
+              size={20}
+              color={hasActiveFilters(filters) ? '#fff' : (isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)')}
+            />
+          </Pressable>
         </View>
 
         {/* Suggestions dropdown — cities then courts */}
@@ -515,6 +564,15 @@ export default function MapsTest() {
         court={selectedCourt}
         checkInsCount={selectedCourt ? courtActivity.get(selectedCourt.id) || 0 : 0}
         onClose={handleClosePreview}
+      />
+      <FilterModal
+        visible={filterModalVisible}
+        filters={filters}
+        onClose={() => setFilterModalVisible(false)}
+        onApply={(newFilters) => {
+          setFilters(newFilters);
+          saveFilters(newFilters);
+        }}
       />
     </View>
   );
