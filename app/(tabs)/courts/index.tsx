@@ -278,7 +278,7 @@ export default function CourtsIndex() {
       <View className="flex-1 bg-white dark:bg-black">
       {/* Header */}
       <View className="px-6 pb-4" style={{ paddingTop: insets.top + 8 }}>
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center justify-center">
           <Image
             source={isDark
               ? require('@/assets/images/splash-icon-dark.png')
@@ -288,7 +288,7 @@ export default function CourtsIndex() {
             resizeMode="contain"
           />
           {hotCourts.length > 0 && (
-            <View className="flex-row items-center rounded-full bg-brand/20 px-4 py-2">
+            <View className="absolute right-0 flex-row items-center rounded-full bg-brand/20 px-4 py-2">
               <View className="mr-2 h-2 w-2 animate-pulse rounded-full bg-brand" />
               <Text className="font-bold text-brand dark:text-brand-light">
                 {hotCourts.length} {hotCourts.length === 1 ? 'game' : 'games'} live
