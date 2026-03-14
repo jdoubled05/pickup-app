@@ -1,16 +1,16 @@
 {
   "expo": {
-    "name": "pickup-nativewind-clean",
-    "slug": "pickup-nativewind-clean",
+    "name": "pickup.",
+    "slug": "pickup",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "pickupnativewindclean",
+    "scheme": "pickup",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.simbasghost.pickupnativewindclean",
+      "bundleIdentifier": "com.simbasghost.pickup",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "We need access to your camera to take photos of basketball courts and share them with the community.",
@@ -27,7 +27,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.simbasghost.pickupnativewindclean",
+      "package": "com.simbasghost.pickup",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",

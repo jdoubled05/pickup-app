@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import { AppState, View, Pressable, ScrollView, Animated, Share, useColorScheme } from "react-native";
+import * as Linking from "expo-linking";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -109,13 +110,15 @@ export default function CourtDetails() {
   }, [court]);
 
   const handleShare = useCallback(async () => {
-    if (!court) return;
+    if (!court || !courtId) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const message = court.address
-      ? `Check out ${court.name} — ${court.address}, ${court.city ?? ''}`
-      : `Check out ${court.name} on Pickup`;
+    const deepLink = Linking.createURL(`/court/${courtId}`);
+    const location = court.address
+      ? `${court.address}, ${court.city ?? ''}`
+      : court.city ?? '';
+    const message = `Check out ${court.name} on Pickup!${location ? `\n${location}` : ''}\n${deepLink}`;
     await Share.share({ message });
-  }, [court]);
+  }, [court, courtId]);
 
   const handleToggleCheckIn = useCallback(async () => {
     if (!courtId || checkInLoading) return;

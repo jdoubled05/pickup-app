@@ -23,10 +23,10 @@
 #### Day 1-2: Navigation & Filters
 **Time: 12-16 hours**
 
-- [ ] Get Directions integration (Apple/Google Maps via Linking API)
-- [ ] Basic court filters (Indoor/Outdoor, Lighting, Hoops)
-- [ ] Search by name/address
-- [ ] Filter UI components
+- [x] Get Directions integration (Apple/Google Maps via Linking API)
+- [x] Basic court filters (Indoor/Outdoor, Lighting, Hoops)
+- [x] Search by name/address
+- [x] Filter UI components
 
 **Deliverable:** Users can filter courts and navigate to them
 
@@ -35,12 +35,12 @@
 #### Day 3-4: Check-in Feature ⭐ (MVP Differentiator)
 **Time: 16-20 hours**
 
-- [ ] "I'm Here" button on court detail page
-- [ ] Display active check-ins count
-- [ ] Auto-expire check-ins after 3 hours
-- [ ] Supabase schema for check-ins table
-- [ ] Real-time subscription for live updates
-- [ ] Optimistic UI updates
+- [x] "I'm Here" button on court detail page
+- [x] Display active check-ins count
+- [x] Auto-expire check-ins after 3 hours
+- [x] Supabase schema for check-ins table
+- [x] Real-time subscription for live updates
+- [x] Optimistic UI updates
 
 **Deliverable:** Users can see who's at courts right now
 
@@ -65,15 +65,15 @@ create index idx_check_ins_expires on check_ins(expires_at);
 #### Day 5: UI/UX Polish
 **Time: 8-10 hours**
 
-- [ ] Remove all debug UI ("Mock data", "Live data" labels)
-- [ ] Remove Supabase status indicators
-- [ ] Remove coordinate displays
-- [ ] Fix duplicate sections in Profile tab (lines 37-48)
-- [ ] Format hours properly (convert JSON to "6:00 AM - 10:00 PM")
-- [ ] Add haptic feedback for save/unsave actions
-- [ ] Better loading states (skeletons)
-- [ ] Improve error messages (user-friendly)
-- [ ] Add pull-to-refresh feedback
+- [x] Remove all debug UI ("Mock data", "Live data" labels)
+- [x] Remove Supabase status indicators
+- [x] Remove coordinate displays
+- [x] Fix duplicate sections in Profile tab (lines 37-48)
+- [x] Format hours properly (convert JSON to "6:00 AM - 10:00 PM")
+- [x] Add haptic feedback for save/unsave actions
+- [x] Better loading states (skeletons)
+- [x] Improve error messages (user-friendly)
+- [x] Add pull-to-refresh feedback
 
 **Deliverable:** App looks production-ready, not a prototype
 
@@ -82,13 +82,13 @@ create index idx_check_ins_expires on check_ins(expires_at);
 #### Day 6: Photo Support
 **Time: 10-12 hours**
 
-- [ ] Install expo-image-picker
-- [ ] Court photo upload (1 photo per court for MVP)
-- [ ] Display photo on detail page
-- [ ] Supabase Storage bucket setup
-- [ ] Image compression before upload
-- [ ] Loading states for image uploads
-- [ ] Fallback for courts without photos
+- [x] Install expo-image-picker
+- [x] Court photo upload (1 photo per court for MVP)
+- [x] Display photo on detail page
+- [x] Supabase Storage bucket setup
+- [x] Image compression before upload
+- [x] Loading states for image uploads
+- [x] Fallback for courts without photos
 
 **Deliverable:** Users can see court photos
 
@@ -153,12 +153,12 @@ https://pickup.app/court/123 (universal link)
 #### Day 9: Onboarding
 **Time: 6-8 hours**
 
-- [ ] Detect first launch (AsyncStorage flag)
-- [ ] Welcome screen with value prop
-- [ ] Location permission explanation (before requesting)
-- [ ] Quick 3-step feature tour
-- [ ] Skip button for impatient users
-- [ ] Don't show again on subsequent launches
+- [x] Detect first launch (AsyncStorage flag)
+- [x] Welcome screen with value prop
+- [x] Location permission explanation (before requesting)
+- [x] Quick 3-step feature tour
+- [x] Skip button for impatient users
+- [x] Don't show again on subsequent launches
 
 **Deliverable:** New users understand the app
 
@@ -292,10 +292,10 @@ TOTAL:                   ~$1,360/year
 ### Phase 2: Strong Nice-to-Haves (Priority 2)
 **Week 3 - Significantly improves UX**
 
-- [ ] Photo uploads
+- [x] Photo uploads
 - [ ] Share/deep linking
-- [ ] Filters & search
-- [ ] Onboarding flow
+- [x] Filters & search
+- [x] Onboarding flow
 
 **Why:** These improve retention and viral growth, but app works without them
 
@@ -328,8 +328,8 @@ If you need to launch in **5-7 days**, ship with ONLY:
 ### Skip for v1.0
 - [ ] Photos (ship in v1.1)
 - [ ] Sharing (ship in v1.1)
-- [ ] Filters (ship in v1.1)
-- [ ] Onboarding (ship in v1.1)
+- [x] Filters (shipped in v1.0)
+- [x] Onboarding (shipped in v1.0)
 
 **Total time: 28-32 hours (1 week)**
 
@@ -362,20 +362,20 @@ This gives users **80% of the value in 40% of the time**. Launch, get feedback, 
 ## 🔧 Technical Setup Checklist
 
 ### Pre-Development
-- [ ] Supabase project created
-- [ ] Environment variables configured (.env)
-- [ ] Git repository clean
-- [ ] Development branch created
+- [x] Supabase project created
+- [x] Environment variables configured (.env)
+- [x] Git repository clean
+- [x] Development branch created
 
 ### During Development
-- [ ] Check-ins table created in Supabase
-- [ ] Storage bucket created for photos
-- [ ] RLS policies configured
-- [ ] Test data seeded
+- [x] Check-ins table created in Supabase
+- [x] Storage bucket created for photos
+- [x] RLS policies configured
+- [x] Test data seeded (Atlanta metro)
 
 ### Pre-Launch
-- [ ] App icons designed (1024×1024)
-- [ ] Splash screen created
+- [x] App icons designed (1024×1024)
+- [x] Splash screen created
 - [ ] App Store listing copy written
 - [ ] Privacy policy created
 - [ ] Terms of service created
@@ -427,6 +427,6 @@ This gives users **80% of the value in 40% of the time**. Launch, get feedback, 
 
 ---
 
-**Last Updated:** 2026-02-13
-**Version:** 1.0
-**Status:** Ready to Execute
+**Last Updated:** 2026-03-13
+**Version:** 1.1
+**Status:** Pre-Launch — TestFlight & App Store prep remaining
