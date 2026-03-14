@@ -273,9 +273,20 @@ export default function MapsTest() {
     const cityMap = new Map<string, { city: string; state: string | null; lat: number; lon: number }>();
     for (const c of source) {
       if (!c.city || typeof c.latitude !== 'number' || typeof c.longitude !== 'number') continue;
-      const key = `${c.city}|${c.state ?? ''}`;
-      if (!cityMap.has(key) && (c.city.toLowerCase().includes(q) || (c.state ?? '').toLowerCase().includes(q))) {
+      // Dedup by city name only (case-insensitive) to avoid "GA" vs "Georgia" duplicates
+      const key = c.city.toLowerCase();
+      const matches = c.city.toLowerCase().includes(q) || (c.state ?? '').toLowerCase().includes(q);
+      if (!matches) continue;
+      if (!cityMap.has(key)) {
         cityMap.set(key, { city: c.city, state: c.state ?? null, lat: c.latitude, lon: c.longitude });
+      } else {
+        // Prefer short state abbreviation (e.g. "GA" over "Georgia") for display
+        const existing = cityMap.get(key)!;
+        const existingStateLen = (existing.state ?? '').length;
+        const newStateLen = (c.state ?? '').length;
+        if (newStateLen > 0 && newStateLen < existingStateLen) {
+          cityMap.set(key, { city: c.city, state: c.state ?? null, lat: c.latitude, lon: c.longitude });
+        }
       }
     }
 
@@ -440,9 +451,9 @@ export default function MapsTest() {
                 <Pressable
                   key={`city-${city.city}-${city.state}`}
                   onPress={() => {
-                    searchInputRef.current?.blur();
-                    setSearchFocused(false);
                     setSearchText(city.state ? `${city.city}, ${city.state}` : city.city);
+                    setSearchFocused(false);
+                    searchInputRef.current?.blur();
                     const coords = { lat: city.lat, lon: city.lon };
                     setCenter(coords);
                     skipRegionFetchRef.current += 1;
@@ -473,9 +484,9 @@ export default function MapsTest() {
               <Pressable
                 key={court.id}
                 onPress={() => {
-                  searchInputRef.current?.blur();
-                  setSearchFocused(false);
                   setSearchText(court.name);
+                  setSearchFocused(false);
+                  searchInputRef.current?.blur();
                   if (typeof court.latitude === 'number' && typeof court.longitude === 'number') {
                     const coords = { lat: court.latitude, lon: court.longitude };
                     setCenter(coords);
