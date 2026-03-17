@@ -54,11 +54,16 @@ type NominatimResult = {
 
 /**
  * Autocomplete city suggestions using Nominatim (OpenStreetMap).
+ * Pass an optional `bias` coordinate to rank geographically nearby results first.
  */
-export async function autocompleteCities(query: string): Promise<CitySuggestion[]> {
+export async function autocompleteCities(query: string, bias?: LatLon): Promise<CitySuggestion[]> {
   if (query.trim().length < 1) return [];
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&countrycodes=us&limit=5`;
+    // Nominatim viewbox biases results toward the user's current area without excluding others
+    const viewboxParam = bias
+      ? `&viewbox=${bias.lon - 5},${bias.lat - 5},${bias.lon + 5},${bias.lat + 5}&bounded=0`
+      : '';
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&addressdetails=1&countrycodes=us&limit=5${viewboxParam}`;
     const res = await fetch(url, { headers: { 'User-Agent': 'PickupApp/1.0' } });
     if (!res.ok) return [];
     const results = await res.json() as NominatimResult[];

@@ -384,6 +384,9 @@ async function main(): Promise<void> {
     const lat = place.geometry.location.lat;
     const lon = place.geometry.location.lng;
 
+    // Skip if outside the Atlanta metro area entirely
+    if (haversineMeters(lat, lon, ATLANTA_CENTER.lat, ATLANTA_CENTER.lon) > DEDUP_RADIUS_M) continue;
+
     // Skip if within 50m of an existing DB court
     const tooCloseToExisting = existing.some(
       c => haversineMeters(lat, lon, c.latitude, c.longitude) < DEDUP_DISTANCE_M

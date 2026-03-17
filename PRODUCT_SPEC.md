@@ -1,8 +1,8 @@
 # 🏀 Pickup - Product Specification
 
-> **Last Updated:** 2026-02-13
+> **Last Updated:** 2026-03-14
 > **Version:** 1.0.0
-> **Status:** In Development - MVP Phase
+> **Status:** MVP Near-Complete — Final Polish Phase
 
 ---
 
@@ -37,23 +37,25 @@ Unlike traditional court finders that only show locations, Pickup shows real-tim
 
 ### MVP Scope
 **In Scope:**
-- Location-based court discovery (50km radius)
-- Court details (indoor/outdoor, hoops, lighting, hours, surface)
-- Real-time check-ins with 3-hour expiration
+- Location-based court discovery (dynamic radius)
+- Court details (indoor/outdoor, hoops, lighting, hours, surface, court size)
+- Real-time check-ins with 3-hour expiration + auto-checkout
 - Save/unsave favorite courts
 - Get directions to courts
-- Court photos (1 per court)
-- Search and filter courts
-- Share courts with friends
+- Search and filter courts (list + map)
+- Map view with clustering and real-time activity indicators
+- Onboarding flow
 
 **Out of Scope (Post-MVP):**
 - User accounts/authentication
+- Court photos (upload + display)
 - Ratings and reviews
 - Game scheduling
 - Social features beyond check-ins
 - Court condition reporting
 - Push notifications
 - User profiles
+- Share & deep linking
 
 ---
 
@@ -66,20 +68,25 @@ Unlike traditional court finders that only show locations, Pickup shows real-tim
 - **React:** 19.1.0
 - **Navigation:** Expo Router 6.0.22 (file-based routing)
 - **Styling:** NativeWind 4.2.1 (Tailwind for React Native)
-- **State Management:** React hooks (useState, useEffect, useCallback)
-- **Maps:** MapLibre React Native 10.4.2
+- **State Management:** React hooks (useState, useEffect, useCallback, useMemo)
+- **Maps:** react-native-maps with Supercluster for clustering
 
 #### Backend
 - **BaaS:** Supabase (PostgreSQL + Storage + Realtime)
-- **Database:** PostgreSQL (via Supabase)
-- **Storage:** Supabase Storage (court photos)
-- **Realtime:** Supabase Realtime subscriptions
+- **Database:** PostgreSQL with PostGIS for geospatial queries
+- **Realtime:** Supabase Realtime subscriptions (check-ins + court activity)
+
+#### Data
+- **Court Data:** 827 Atlanta metro courts
+  - OSM outdoor courts via `scripts/import-osm-courts.ts`
+  - Google Places indoor courts (YMCAs, rec centers) via `scripts/import-google-courts.ts`
+  - Deduplication: 50m proximity threshold, geographic bounds filter
 
 #### Developer Tools
 - **Build Tool:** Expo 54.0.32
+- **OTA Updates:** EAS Update (branch: `preview`)
 - **Language:** TypeScript 5.9.2
 - **Linting:** ESLint with Expo config
-- **Version Control:** Git
 
 ### App Architecture
 
@@ -92,114 +99,104 @@ app/
 ├── court/
 │   └── [id].tsx           # Court detail page
 ├── saved.tsx              # Saved courts list
-├── welcome.tsx            # Onboarding flow
-└── _layout.tsx            # Root layout
+└── welcome.tsx            # Onboarding flow (shows on first launch)
 
 src/
 ├── components/
-│   ├── ui/                # Reusable UI components
-│   └── Map/               # Map-specific components
-├── services/              # Business logic & API calls
-│   ├── courts.ts          # Court data operations
-│   ├── savedCourts.ts     # Local saved courts
-│   ├── checkins.ts        # Check-in operations
-│   ├── location.ts        # Geolocation services
-│   └── supabase.ts        # Supabase client
+│   ├── ui/                # Reusable UI components (Text, Button, etc.)
+│   ├── Map/               # Map-specific components
+│   │   ├── CourtsMap.tsx          # Map with Supercluster clustering
+│   │   └── BottomSheetCourtPreview.tsx
+│   ├── BasketballRefreshControl.tsx
+│   └── FilterModal.tsx    # Shared filter modal
+├── services/
+│   ├── courts.ts          # Court data operations (listCourtsNearby, searchCourts)
+│   ├── savedCourts.ts     # AsyncStorage saved courts
+│   ├── checkins.ts        # Check-in CRUD + realtime
+│   ├── courtActivity.ts   # Batch activity + realtime subscriptions
+│   ├── courtFilters.ts    # Filter logic + AsyncStorage persistence
+│   ├── location.ts        # Geolocation, geocoding, city autocomplete
+│   └── supabase.ts        # Supabase client + env status
 └── types/                 # TypeScript definitions
-    ├── courts.ts
-    ├── checkins.ts
-    └── db.ts
 ```
 
 ### Data Flow
 
 1. **Court Discovery:**
    - User opens app → Request location permission
-   - Get device location (or default to Atlanta)
-   - Query Supabase RPC `courts_nearby(lat, lon, radius)`
+   - Get device location (or default to Atlanta center)
+   - Query Supabase RPC `courts_nearby(lat, lon, radius)` — up to 1000 courts
    - Display sorted by distance
 
 2. **Check-ins:**
    - User taps "I'm Here" → Create check-in record
    - Supabase realtime broadcasts to all viewers
    - UI updates optimistically + confirms on success
-   - Background job expires check-ins after 3 hours
+   - Check-ins expire after 3 hours; auto-checkout on expiry
+   - User can only check in to one court at a time
 
 3. **Saved Courts:**
-   - Local-first (AsyncStorage) for offline access
-   - No backend sync required for MVP
-   - Hydrate on app launch
-   - Observable pattern for reactivity
+   - Local-first (AsyncStorage) — no backend sync
+   - Observable pattern for reactivity across screens
+
+4. **Map Activity:**
+   - `getCourtActivityBatch` fetches active check-in counts for all visible courts
+   - `subscribeToActivityUpdates` maintains real-time channel per session
+   - Courts with active check-ins shown with 🔥 flame markers
 
 ---
 
 ## Feature Specifications
 
-### F1: Court Discovery & List View
+### F1: Court Discovery & List View ✅
 
 **Priority:** P0 (Must Have)
-
-**User Story:**
-As a user, I want to see nearby basketball courts sorted by distance so I can find courts close to me.
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
-- [ ] Shows courts within 50km radius of user location
-- [ ] Falls back to default location (Atlanta) if permission denied
-- [ ] Displays: court name, address, distance, indoor/outdoor, hoops, lighting
-- [ ] Sorted by distance (closest first)
-- [ ] Pull-to-refresh updates list
-- [ ] Shows loading skeleton while fetching
-- [ ] Shows empty state if no courts found
-- [ ] Tapping court navigates to detail page
+- [x] Shows courts within user's area (default 50km, adjusts with map viewport)
+- [x] Falls back to default location (Atlanta, 33.749, -84.388) if permission denied
+- [x] Displays: court name, address, distance, indoor/outdoor, hoops, lighting, court size
+- [x] Sorted by distance (closest first)
+- [x] Pull-to-refresh updates list (BasketballRefreshControl)
+- [x] Shows loading skeleton while fetching
+- [x] Shows empty state if no courts found
+- [x] Tapping court navigates to detail page
+- [x] Search bar with court name/address/city autocomplete
+- [x] "X courts nearby" with 🔥 live badge when active courts exist
+- [x] Logo header centered, no tagline
+- [x] Keyboard dismisses when tapping header
 
-**Implementation Notes:**
-- Use `getForegroundLocationOrDefault()` from location service
-- Call `listCourtsNearby(lat, lon, 50000)` from courts service
-- Memoize sorted courts to prevent re-renders
-- Show "X courts nearby" in header
-
-**Files to Modify:**
-- `app/(tabs)/courts/index.tsx` (already implemented, needs polish)
+**Key Files:**
+- `app/(tabs)/courts/index.tsx`
 
 ---
 
-### F2: Court Detail Page
+### F2: Court Detail Page ✅
 
 **Priority:** P0 (Must Have)
-
-**User Story:**
-As a user, I want to see detailed information about a court so I can decide if I want to visit.
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
-- [ ] Shows: name, address, photo, indoor/outdoor, surface type, hoops, lighting, hours
-- [ ] Displays active check-ins count ("3 people here now")
-- [ ] "Get Directions" button opens Maps app
-- [ ] "I'm Here" check-in button (toggles state)
-- [ ] Save/unsave button (with haptic feedback)
-- [ ] Share button (native share sheet)
-- [ ] Real-time updates when check-ins change
+- [x] Shows: name, address, indoor/outdoor, surface type, court size, hoops, lighting, hours
+- [x] Displays active check-ins count ("3 people here now")
+- [x] "Get Directions" button opens Maps app (Apple Maps on iOS, Google Maps on Android)
+- [x] "I'm Here" check-in button (toggles, auto-expires at 3h)
+- [x] Save/unsave button with haptic feedback
+- [x] Real-time updates when check-ins change
+- [x] Hours formatted from JSON to readable format
+- [x] Pull-to-refresh
 
-**Implementation Notes:**
-- Use `getCourtById(id)` to fetch data
-- Subscribe to check-ins changes via Supabase realtime
-- Use `Linking.openURL()` for directions:
-  - iOS: `maps://maps.apple.com/?q=lat,lon`
-  - Android: `geo:lat,lon?q=lat,lon`
-- Format hours: convert `{"open": "06:00", "close": "22:00"}` → "6:00 AM - 10:00 PM"
-
-**Files to Modify:**
-- `app/court/[id].tsx` (exists, needs directions + check-ins)
-- Create `src/services/checkins.ts` (new)
+**Key Files:**
+- `app/court/[id].tsx`
+- `src/services/checkins.ts`
 
 ---
 
 ### F3: Real-Time Check-Ins ✅
 
-**Priority:** P0 (Must Have - Core Differentiator)
-**Status:** ✅ Implemented
-
-**User Story:**
-As a user, I want to check in when I arrive at a court and see who else is there so I know if there's an active game.
+**Priority:** P0 (Must Have — Core Differentiator)
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
 - [x] "I'm Here" button on court detail page
@@ -207,9 +204,10 @@ As a user, I want to check in when I arrive at a court and see who else is there
 - [x] Check-in expires after 3 hours automatically
 - [x] Real-time updates (no refresh needed)
 - [x] Optimistic UI (instant feedback)
-- [x] Anonymous check-ins (no account required)
+- [x] Anonymous check-ins (no account required) — device ID via expo-constants
 - [x] User can only check in to one court at a time
 - [x] Tapping "I'm Here" again removes check-in
+- [x] Auto-checkout when expiry timer fires client-side
 
 **Database Schema:**
 ```sql
@@ -220,278 +218,125 @@ create table check_ins (
   created_at timestamp with time zone default now(),
   expires_at timestamp with time zone default (now() + interval '3 hours')
 );
-
-create index idx_check_ins_court on check_ins(court_id);
-create index idx_check_ins_expires on check_ins(expires_at);
-create index idx_check_ins_user on check_ins(anonymous_user_id);
-
--- Enable realtime
-alter publication supabase_realtime add table check_ins;
 ```
 
-**Implementation Notes:**
-- Generate `anonymous_user_id` using `expo-constants` deviceId
-- Store in AsyncStorage for consistency
-- Use Supabase `.insert()` to create check-in
-- Subscribe to changes: `supabase.from('check_ins').on('*', callback).subscribe()`
-- Query active check-ins: `expires_at > now()`
-- Auto-remove expired check-ins client-side
-
-**New Files:**
+**Key Files:**
 - `src/services/checkins.ts`
-- `src/types/checkins.ts`
-
-**Files to Modify:**
-- `app/court/[id].tsx`
+- `src/services/courtActivity.ts`
 
 ---
 
 ### F4: Get Directions ✅
 
 **Priority:** P0 (Must Have)
-**Status:** ✅ Implemented
-
-**User Story:**
-As a user, I want to get directions to a court so I can navigate there easily.
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
 - [x] "Get Directions" button on court detail page
 - [x] Opens native Maps app with court location
-- [x] Works on both iOS (Apple Maps) and Android (Google Maps)
-- [x] Handles cases where lat/lon are missing gracefully
-
-**Implementation:**
-```typescript
-import { Linking, Platform } from 'react-native';
-
-const openDirections = (lat: number, lon: number, name: string) => {
-  const scheme = Platform.select({
-    ios: 'maps://maps.apple.com/',
-    android: 'geo:',
-  });
-
-  const url = Platform.select({
-    ios: `${scheme}?q=${encodeURIComponent(name)}&ll=${lat},${lon}`,
-    android: `${scheme}${lat},${lon}?q=${lat},${lon}(${encodeURIComponent(name)})`,
-  });
-
-  Linking.openURL(url);
-};
-```
-
-**Files to Modify:**
-- `app/court/[id].tsx`
-- Create `src/utils/directions.ts`
+- [x] Works on iOS (Apple Maps) and Android (Google Maps)
+- [x] Handles missing lat/lon gracefully
 
 ---
 
-### F5: Save Courts
+### F5: Save Courts ✅
 
 **Priority:** P0 (Must Have)
-
-**User Story:**
-As a user, I want to save my favorite courts so I can quickly access them later.
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
 - [x] Save/unsave button on court detail page
-- [x] Visual indicator when saved (different button style)
-- [x] Saved courts list accessible from main screen
-- [x] Shows saved count in multiple places
-- [x] Persists across app restarts
+- [x] Visual indicator when saved
+- [x] Saved courts list accessible from profile tab
+- [x] Persists across app restarts (AsyncStorage)
 - [x] Remove from saved list
-- [ ] Add haptic feedback on save/unsave
-
-**Implementation Notes:**
-- Already implemented using AsyncStorage
-- Add haptic feedback: `import * as Haptics from 'expo-haptics'; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);`
-
-**Files to Modify:**
-- `src/services/savedCourts.ts` (add haptics)
-- `app/court/[id].tsx` (add haptics)
+- [x] Haptic feedback on save/unsave
 
 ---
 
 ### F6: Court Photos
 
 **Priority:** P1 (High Priority)
+**Status:** ⬜ Post-MVP
 
-**User Story:**
-As a user, I want to see photos of courts so I know what they look like before visiting.
-
-**Acceptance Criteria:**
-- [ ] Display court photo on detail page (if exists)
-- [ ] Upload photo button (1 photo per court for MVP)
-- [ ] Photo compresses before upload (<1MB)
-- [ ] Fallback placeholder if no photo
-- [ ] Loading state during upload
-- [ ] Photos stored in Supabase Storage
-
-**Storage Schema:**
-```sql
--- Create bucket
-insert into storage.buckets (id, name, public)
-values ('court-photos', 'court-photos', true);
-
--- RLS policies
-create policy "Photos are publicly accessible"
-on storage.objects for select
-using ( bucket_id = 'court-photos' );
-
-create policy "Anyone can upload photos"
-on storage.objects for insert
-with check ( bucket_id = 'court-photos' );
-```
-
-**Implementation:**
-```typescript
-import * as ImagePicker from 'expo-image-picker';
-
-// Pick image
-const result = await ImagePicker.launchImageLibraryAsync({
-  mediaTypes: ImagePicker.MediaTypeOptions.Images,
-  allowsEditing: true,
-  aspect: [16, 9],
-  quality: 0.7,
-});
-
-// Upload to Supabase
-const { data, error } = await supabase.storage
-  .from('court-photos')
-  .upload(`${courtId}.jpg`, file);
-```
-
-**New Files:**
-- `src/services/photos.ts`
-
-**Files to Modify:**
-- `app/court/[id].tsx`
-- Update `Court` type to include `photo_url`
+Deferred to post-launch. Will use Supabase Storage + expo-image-picker.
 
 ---
 
-### F7: Filter & Search
+### F7: Filter & Search ✅
 
 **Priority:** P1 (High Priority)
-
-**User Story:**
-As a user, I want to filter courts by type and search by name so I can find specific courts.
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
-- [ ] Search bar filters by court name or address
-- [ ] Filter chips: All, Indoor, Outdoor, Lighting, No Lighting
-- [ ] Filter by number of hoops: 2+, 4+, 6+
-- [ ] Filters persist during session
-- [ ] Clear filters button
-- [ ] Show count: "42 courts (5 filtered)"
+- [x] Search bar on courts list (name, address, city)
+- [x] Search bar on map (courts + city autocomplete via Nominatim)
+- [x] Filter modal: Indoor/Outdoor, Lighting, Active now, Court size (Full/Half/Both)
+- [x] Filter by number of hoops: Any, 2+, 4+, 6+
+- [x] Filters persist across sessions (AsyncStorage)
+- [x] Active filter indicator on filter button
+- [x] Available on both courts list and map screens
 
-**Implementation Notes:**
-- Client-side filtering (don't re-query Supabase)
-- Use `useMemo` for performance
-- Store filter state in component
-
-**Files to Modify:**
+**Key Files:**
+- `src/services/courtFilters.ts`
+- `src/components/FilterModal.tsx`
 - `app/(tabs)/courts/index.tsx`
-- Create `src/components/CourtFilters.tsx`
+- `app/(tabs)/map.tsx`
 
 ---
 
 ### F8: Share Court
 
 **Priority:** P1 (High Priority)
+**Status:** ⬜ Post-MVP
 
-**User Story:**
-As a user, I want to share a court with friends so they can see it too.
-
-**Acceptance Criteria:**
-- [ ] Share button on court detail page
-- [ ] Opens native share sheet
-- [ ] Share text includes: court name, address, app link
-- [ ] Deep link opens app to court detail
-- [ ] Works on both iOS and Android
-
-**Implementation:**
-```typescript
-import * as Sharing from 'expo-sharing';
-import * as Linking from 'expo-linking';
-
-const shareCourt = async (court: Court) => {
-  const url = Linking.createURL(`/court/${court.id}`);
-  const message = `Check out ${court.name} on Pickup!\n${court.address}\n\n${url}`;
-
-  await Sharing.shareAsync(message);
-};
-```
-
-**Deep Link Configuration:**
-```json
-// app.json
-{
-  "expo": {
-    "scheme": "pickup",
-    "web": {
-      "bundler": "metro"
-    }
-  }
-}
-```
-
-**New Files:**
-- `src/utils/sharing.ts`
-
-**Files to Modify:**
-- `app/court/[id].tsx`
-- `app.json` (add scheme)
+Deferred. Will use expo-sharing + deep links.
 
 ---
 
-### F9: Onboarding Flow
+### F9: Onboarding Flow ✅
 
 **Priority:** P2 (Nice to Have)
-
-**User Story:**
-As a new user, I want to understand what the app does so I can use it effectively.
+**Status:** ✅ Complete
 
 **Acceptance Criteria:**
-- [ ] Shows on first launch only
-- [ ] 3 screens: Welcome, Location, Features
-- [ ] Skip button on each screen
-- [ ] "Get Started" button on final screen
-- [ ] Never shows again after completion
+- [x] Shows on first launch only
+- [x] Multi-screen carousel (Welcome, Features, Location/Access)
+- [x] "Get Started" navigates to main app
+- [x] Never shows again after completion (AsyncStorage flag)
 
-**Implementation Notes:**
-- Use AsyncStorage flag: `onboarding_completed`
-- Simple swipeable carousel
-- Conditionally render in `app/_layout.tsx`
-
-**New Files:**
-- `app/onboarding.tsx`
-- `src/components/OnboardingCarousel.tsx`
+**Key Files:**
+- `app/welcome.tsx`
 
 ---
 
-### F10: Map View
+### F10: Map View ✅
 
 **Priority:** P2 (Nice to Have)
-
-**User Story:**
-As a user, I want to see courts on a map so I can visualize their locations.
+**Status:** ✅ Complete — significantly beyond original spec
 
 **Acceptance Criteria:**
-- [x] Map tab shows all nearby courts as pins
-- [x] Tap pin to see court name
-- [x] Tap court card to navigate to detail
-- [ ] Show check-in count on pins (badge)
-- [x] Recenter button to return to user location
-- [x] Refresh button to reload courts
+- [x] Map tab shows all courts as pins (up to 1000 from DB)
+- [x] Court clustering via Supercluster (radius: 30px, maxZoom: 16)
+  - Cluster tapping zooms in to expand
+  - Cluster badge shows court count
+  - Clusters with active courts show 🔥
+- [x] Individual courts: location pin (🔥 overlay when active)
+- [x] Tap pin → bottom sheet court preview → navigate to detail
+- [x] Recenter + Refresh buttons
+- [x] Search bar with court name and city autocomplete
+  - City suggestions: DB courts (instant, proximity-sorted) + Nominatim (500ms debounce, location-biased)
+  - Court suggestions: name/address match from Supabase searchCourts
+- [x] Filter modal (same filters as courts list, persisted)
+- [x] Dynamic fetch radius matches visible viewport (half-diagonal, 5–200km clamp)
+- [x] Dark mode map style
+- [x] Programmatic re-center on search/recenter without stuck update loops
+- [x] Zoom out fix: clamped zoom (0–20), clamped bbox (±180/±85)
 
-**Implementation Notes:**
-- Already implemented at `app/(tabs)/map.tsx`
-- Move from `/maps-test` to main tab bar
-- Add check-in count badges to pins
-
-**Files to Modify:**
-- `app/(tabs)/map.tsx` (add check-in badges)
+**Key Files:**
+- `app/(tabs)/map.tsx`
 - `src/components/Map/CourtsMap.tsx`
+- `src/components/Map/BottomSheetCourtPreview.tsx`
 
 ---
 
@@ -501,48 +346,36 @@ As a user, I want to see courts on a map so I can visualize their locations.
 
 ```typescript
 interface Court {
-  // Identity
   id: string;
   name: string;
   description: string | null;
-
-  // Location
   latitude: number;
   longitude: number;
-  location: any | null; // PostGIS geography
   address: string | null;
   city: string | null;
   state: string | null;
   postal_code: string | null;
   country: string;
   timezone: string;
-
-  // Court details
   indoor: boolean | null;
-  surface_type: string | null; // 'asphalt', 'concrete', 'hardwood', 'rubber'
+  surface_type: string | null;
   num_hoops: number | null;
   lighting: boolean | null;
-
-  // Hours
+  court_size: 'full' | 'half' | 'both' | null; // mapped from DB full_court boolean
   open_24h: boolean;
-  hours_json: any | null; // { open: "06:00", close: "22:00" }
-
-  // Metadata
-  amenities_json: string[] | null; // ['lights', 'parking', 'restrooms', 'water']
+  hours_json: unknown | null;
+  amenities_json: string[] | null;
   photos_count: number;
-  photo_url: string | null; // Supabase storage URL
-
-  // Source
-  osm_type: string | null; // 'node', 'way', 'relation'
-  osm_id: number | null;
-
-  // Timestamps
+  photo_url: string | null;
+  is_free: boolean | null;
+  is_public: boolean | null;
+  source: string | null;          // 'osm' | 'google' | 'manual'
+  google_place_id: string | null;
+  osm_type: string | null;
+  osm_id: string | null;
   created_at: string;
   updated_at: string;
-
-  // Computed (from query)
-  distance_meters?: number;
-  check_ins_count?: number;
+  distance_meters?: number;       // computed by courts_nearby RPC
 }
 ```
 
@@ -556,105 +389,49 @@ interface CheckIn {
   created_at: string;
   expires_at: string;
 }
+```
 
-interface CheckInWithCourt extends CheckIn {
-  court: Court;
+### CourtFilters
+
+```typescript
+interface CourtFilters {
+  indoorOutdoor: 'all' | 'indoor' | 'outdoor';
+  lighting: 'all' | 'yes' | 'no';
+  minHoops: 0 | 2 | 4 | 6;
+  activeOnly: boolean;
+  courtSize: 'all' | 'full' | 'half' | 'both';
 }
 ```
 
 ### Supabase RPC Functions
 
 ```sql
--- Get court by ID
-create or replace function court_by_id(court_id text)
-returns setof courts
-language sql
-as $$
-  select * from courts where id = court_id limit 1;
-$$;
-
--- Get nearby courts with distance
+-- Get nearby courts with distance (returns up to 1000)
 create or replace function courts_nearby(
   lat double precision,
   lon double precision,
   radius_meters integer,
-  limit_count integer default 100
+  limit_count integer default 1000
 )
-returns table (
-  id text,
-  name text,
-  description text,
-  latitude double precision,
-  longitude double precision,
-  address text,
-  city text,
-  state text,
-  postal_code text,
-  country text,
-  timezone text,
-  indoor boolean,
-  surface_type text,
-  num_hoops integer,
-  lighting boolean,
-  open_24h boolean,
-  hours_json jsonb,
-  amenities_json jsonb,
-  photos_count integer,
-  photo_url text,
-  created_at timestamp with time zone,
-  updated_at timestamp with time zone,
-  distance_meters double precision
-)
-language sql
-as $$
-  select
-    id,
-    name,
-    description,
-    latitude,
-    longitude,
-    address,
-    city,
-    state,
-    postal_code,
-    country,
-    timezone,
-    indoor,
-    surface_type,
-    num_hoops,
-    lighting,
-    open_24h,
-    hours_json,
-    amenities_json,
-    photos_count,
-    photo_url,
-    created_at,
-    updated_at,
-    ST_Distance(
-      location::geography,
-      ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography
-    ) as distance_meters
-  from courts
-  where ST_DWithin(
-    location::geography,
-    ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography,
-    radius_meters
-  )
-  order by distance_meters
-  limit limit_count;
-$$;
+returns table ( ... distance_meters double precision )
+-- Orders by distance ASC, uses ST_DWithin on geography column
 
--- Get active check-ins for a court
+-- Get court by ID
+create or replace function court_by_id(court_id text)
+returns setof courts
+
+-- Active check-ins for a court (expires_at > now())
 create or replace function get_active_checkins(p_court_id text)
 returns setof check_ins
-language sql
-as $$
-  select * from check_ins
-  where court_id = p_court_id
-    and expires_at > now()
-  order by created_at desc;
-$$;
 ```
+
+### DB Schema Notes (Live, differs from migrations)
+
+- `latitude` / `longitude` are real columns (not removed)
+- `location geography` is nullable, populated by trigger from lat/lon
+- `osm_id` is `text` (not bigint)
+- `full_court boolean` is the actual DB column; TypeScript `court_size` maps it
+- `source` and `google_place_id` added by migration 008
 
 ---
 
@@ -663,11 +440,11 @@ $$;
 ### Design System
 
 **Colors:**
-- Background: `#000000` (black)
-- Text Primary: `#FFFFFF` (white)
+- Background: `#000000` / `bg-black`
+- Brand: `#960000` (dark red)
+- Text Primary: `#FFFFFF`
 - Text Secondary: `rgba(255, 255, 255, 0.7)`
 - Text Tertiary: `rgba(255, 255, 255, 0.5)`
-- Text Quaternary: `rgba(255, 255, 255, 0.4)`
 - Borders: `rgba(255, 255, 255, 0.1)`
 - Card Background: `rgba(255, 255, 255, 0.05)`
 
@@ -676,45 +453,23 @@ $$;
 - Body: Regular, base
 - Meta: Regular, sm-xs, low opacity
 
-**Spacing:**
-- Screen padding: `px-6 py-6`
-- Card padding: `p-4`
-- Gaps: `gap-3` or `mt-3`
-
 **Components:**
 - Rounded corners: `rounded-2xl`
 - Cards: `border border-white/10 bg-white/5 p-4 rounded-2xl`
 - Buttons: Primary (white bg) or Secondary (white/10 border)
+- Screen padding: `px-6 py-6`
 
 ### Interaction Patterns
 
-**Loading States:**
-- Use skeleton loaders (animated gray bars)
-- Never show blank screens
-- Always provide feedback
-
-**Error States:**
-- User-friendly messages (not technical errors)
-- Provide retry actions
-- Never crash silently
-
-**Empty States:**
-- Explain why empty ("No courts found near you")
-- Provide action ("Try increasing radius" or "Add a court")
-- Never just show empty list
-
-**Haptic Feedback:**
-- Save/unsave: Medium impact
-- Check-in: Medium impact
-- Errors: Notification feedback
-- Success: Success feedback
+**Loading States:** Skeleton loaders, never blank screens
+**Error States:** User-friendly messages, retry actions
+**Empty States:** Explain why + provide action
+**Haptic Feedback:** Save/unsave (Medium), check-in (Medium), errors (Notification)
 
 ### Accessibility
-
-- All tappable areas minimum 44pt
+- Minimum 44pt tappable areas
+- `accessibilityLabel` on all interactive elements
 - Sufficient color contrast
-- Support for larger text sizes
-- Descriptive labels for screen readers
 
 ---
 
@@ -728,278 +483,194 @@ EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-**Client Configuration:**
-```typescript
-import { createClient } from '@supabase/supabase-js';
+Always use `getSupabaseEnvStatus()` to check if configured. Fall back to mock data if not.
 
-export const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    auth: {
-      persistSession: false, // No auth for MVP
-    },
-  }
-);
-```
+### Location Services
 
-### Realtime Subscriptions
-
-**Check-ins:**
-```typescript
-const subscription = supabase
-  .channel(`court:${courtId}`)
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'check_ins',
-      filter: `court_id=eq.${courtId}`,
-    },
-    (payload) => {
-      // Handle insert/delete
-      handleCheckInChange(payload);
-    }
-  )
-  .subscribe();
-
-// Cleanup
-return () => {
-  subscription.unsubscribe();
-};
-```
-
-### Error Handling
-
-- Always have fallback to mock data
-- Log errors in development only
-- Show user-friendly messages
-- Retry transient failures automatically
+**`src/services/location.ts` exports:**
+- `getForegroundLocationOrDefault()` — requests permission, falls back to Atlanta
+- `geocodeAddress(query)` — Nominatim geocoder, ZIP-aware
+- `autocompleteCities(query, bias?)` — Nominatim city autocomplete with viewbox bias
+- `DEFAULT_CENTER` — Atlanta `{ lat: 33.749, lon: -84.388 }`
 
 ---
 
 ## Testing Requirements
 
+### E2E Testing: Maestro
+
+**Setup:**
+```bash
+# Install (macOS)
+brew install maestro
+
+# Verify
+maestro --version
+```
+
+**Project structure:**
+```
+.maestro/
+├── courts-list.yaml       # Browse and search courts list
+├── court-detail.yaml      # View court detail, check in, get directions
+├── map-search.yaml        # Map search and navigation
+├── save-courts.yaml       # Save/unsave flow
+├── filters.yaml           # Apply and clear filters
+└── onboarding.yaml        # First-launch onboarding
+```
+
+**Running tests:**
+```bash
+# Run single flow
+maestro test .maestro/courts-list.yaml
+
+# Run all flows
+maestro test .maestro/
+
+# Run on specific device
+maestro test --device <device-id> .maestro/courts-list.yaml
+```
+
+**Example flow (`courts-list.yaml`):**
+```yaml
+appId: com.pickup.app
+---
+- launchApp
+- assertVisible: "courts"       # tab visible
+- tapOn: "courts"
+- waitForAnimationToEnd
+- assertVisible:
+    text: "nearby"
+    enabled: true
+- tapOn:
+    id: "search-input"
+- inputText: "Duluth"
+- assertVisible: "Duluth, GA"
+- tapOn: "Duluth, GA"
+- waitForAnimationToEnd
+- assertVisible: "courts"
+```
+
+**Claude-assisted test generation:**
+Provide Claude with a user journey description and `PRODUCT_SPEC.md`. Claude can generate complete Maestro YAML flows covering happy paths and edge cases for any feature.
+
 ### Manual Testing Checklist
 
-**Before Each Commit:**
-- [ ] App builds without errors
-- [ ] No TypeScript errors
-- [ ] No console errors
+**Before Each Build:**
+- [ ] `npx tsc --noEmit` — no TypeScript errors
+- [ ] No console errors/warnings in dev
 - [ ] Test on iOS simulator
-- [ ] Test on Android emulator (if applicable)
 
-**Before Each Feature PR:**
-- [ ] Feature works on iOS
-- [ ] Feature works on Android
-- [ ] Works with mock data (Supabase disabled)
-- [ ] Works with live data (Supabase enabled)
-- [ ] Loading states display correctly
-- [ ] Error states display correctly
-- [ ] Empty states display correctly
+**Before OTA Push (`eas update`):**
+- [ ] Core flows work: browse courts, view detail, check in, save, map search
+- [ ] Works with Supabase enabled and disabled (mock data)
+- [ ] Loading and error states display correctly
+- [ ] Dark mode renders correctly
 
-**Before Launch:**
+**Before App Store Submission:**
 - [ ] Test on physical iOS device
-- [ ] Test on physical Android device
 - [ ] Test location permission denied
-- [ ] Test network offline
+- [ ] Test offline/airplane mode
 - [ ] Test app backgrounding/foregrounding
-- [ ] Test deep links
-- [ ] Performance audit (no memory leaks)
-- [ ] Remove all console.logs
+- [ ] No debug UI or console.logs
+- [ ] Performance: no jank on map with 800+ courts
 
-### Edge Cases to Test
+### Edge Cases
 
-1. **Location:**
-   - Permission denied
-   - Location unavailable
-   - Location takes long time
+1. **Location:** permission denied → default Atlanta; slow → loading state
+2. **Network:** offline → mock data or cached; slow → loading states
+3. **Map:** zoom out fully → courts still cluster (not disappear); viewport radius caps at 200km
+4. **Check-ins:** expire mid-session → auto-checkout fires; multiple courts → only one active
+5. **Search:** city not in DB → Nominatim fallback; partial city name → DB prefix match
 
-2. **Network:**
-   - Offline mode
-   - Slow connection
-   - Request timeout
-   - Supabase down
+---
 
-3. **Data:**
-   - No courts nearby
-   - Court missing data (null fields)
-   - Invalid coordinates
-   - Check-in expiration
+## Implementation Priority
+
+### Phase 1: Core MVP ✅ Complete
+1. ✅ Court discovery + list view
+2. ✅ Court detail page
+3. ✅ Real-time check-ins
+4. ✅ Get directions
+5. ✅ Save/unsave courts with haptics
+6. ✅ Map view with clustering + activity
+7. ✅ Search (courts list + map)
+8. ✅ Filters (indoor/outdoor, lighting, hoops, active, court size)
+9. ✅ Onboarding flow
+10. ✅ Dark mode
+11. ✅ 827 Atlanta metro courts imported
+
+### Phase 2: Post-Launch
+1. ⬜ Court photos (upload + display)
+2. ⬜ Share & deep linking
+3. ⬜ E2E Maestro test suite
+4. ⬜ Analytics (Posthog or similar)
+5. ⬜ Push notifications for active courts nearby
+6. ⬜ Expand to additional cities
+
+### Phase 3: Growth
+7. ⬜ User feedback / court reports
+8. ⬜ `search_cities` Supabase RPC for better city autocomplete
+9. ⬜ Rate limiting for check-in spam
+10. ⬜ Court condition reporting
 
 ---
 
 ## Development Guidelines
 
 ### Code Style
+- TypeScript: explicit types on all params and returns, no `any`
+- Components: Imports → Types → Component → Exports
+- Use `useMemo` for expensive computations, `useCallback` for child function props
+- NativeWind classes over StyleSheet.create
 
-**File Naming:**
-- Components: PascalCase (`CourtCard.tsx`)
-- Services: camelCase (`courts.ts`)
-- Utils: camelCase (`directions.ts`)
-
-**Component Structure:**
-```typescript
-// 1. Imports
-import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
-
-// 2. Types
-interface Props {
-  courtId: string;
-}
-
-// 3. Component
-export default function CourtDetail({ courtId }: Props) {
-  // 3a. State
-  const [court, setCourt] = useState<Court | null>(null);
-
-  // 3b. Effects
-  useEffect(() => {
-    loadCourt();
-  }, [courtId]);
-
-  // 3c. Handlers
-  const loadCourt = async () => {
-    // ...
-  };
-
-  // 3d. Render
-  return (
-    <View>
-      {/* ... */}
-    </View>
-  );
-}
-```
-
-**TypeScript:**
-- Explicit types for all function parameters
-- Explicit return types for functions
-- No `any` types (use `unknown` if necessary)
-- Interface for objects, type for unions/primitives
-
-**Comments:**
-- Explain "why", not "what"
-- Document complex business logic
-- No obvious comments
-
-### Git Workflow
-
-**Branch Strategy:**
-```
-main            # Production-ready code
-├── mvp-launch  # MVP development branch
-    ├── feature/directions
-    ├── feature/check-ins
-    └── feature/filters
-```
-
-**Commit Messages:**
-```
-feat: add get directions button to court detail
-fix: correct hours formatting for 12-hour time
-chore: remove debug UI from courts list
-docs: update product spec with check-in schema
-```
-
-**Before Committing:**
+### Git / OTA Workflow
 ```bash
-# Lint
-npm run lint
+# OTA update (preferred for JS-only changes)
+CI=1 eas update --platform ios --branch preview --message "feat: ..."
 
-# Type check
-npx tsc --noEmit
-
-# Build test
-npm run ios  # or android
+# Native changes require full build
+npx expo run:ios
 ```
 
-### Performance Considerations
+### Import Scripts
+```bash
+# Seed courts (run OSM first, then Google)
+npm run import-courts -- --city="atlanta" --metro
+npm run import-google-courts
 
-**Optimization Rules:**
-- Use `useMemo` for expensive computations
-- Use `useCallback` for functions passed to children
-- Lazy load images with `expo-image`
-- Debounce search/filter inputs
-- Paginate long lists (>100 items)
-- Compress images before upload
-
-**Bundle Size:**
-- Avoid large dependencies
-- Use tree-shaking
-- Remove unused imports
-- No lodash (use native JS)
-
----
-
-## Implementation Priority
-
-### Phase 1: Core MVP (Week 1-2)
-1. ✅ Get Directions integration (COMPLETED)
-2. ✅ Check-in feature with realtime (COMPLETED)
-3. ⬜ Remove all debug UI
-4. ⬜ Fix Profile tab duplicates
-5. ⬜ Format hours properly
-6. ⬜ Add haptic feedback
-
-### Phase 2: Enhancement (Week 3)
-7. ⬜ Court photos
-8. ⬜ Share & deep linking
-9. ⬜ Filters & search
-10. ⬜ Onboarding flow
-
-### Phase 3: Post-Launch (Week 4+)
-11. ⬜ User feedback integration
-12. ⬜ Analytics tracking
-13. ⬜ Performance optimization
-14. ⬜ Bug fixes from beta testing
-
----
-
-## Definition of Done
-
-A feature is considered "done" when:
-- [ ] Code implemented and tested
-- [ ] Works on iOS and Android
-- [ ] Handles loading/error/empty states
-- [ ] TypeScript types defined
-- [ ] No console errors or warnings
-- [ ] Committed with descriptive message
-- [ ] Tested on physical device
-- [ ] Documented in spec (if applicable)
+# Geographic bounds filter in import-google-courts.ts
+# prevents non-Atlanta courts from being imported
+```
 
 ---
 
 ## Questions & Decisions Log
 
 ### Decided
-1. **Q:** Should we require user accounts?
-   **A:** No, anonymous for MVP. Check-ins use device ID.
-
-2. **Q:** How long should check-ins last?
-   **A:** 3 hours (typical game length).
-
-3. **Q:** Should we support multiple photos per court?
-   **A:** No, 1 photo for MVP to reduce complexity.
-
-4. **Q:** Web support?
-   **A:** No, mobile-only for MVP.
+1. **Anonymous check-ins:** Device ID via expo-constants, stored in AsyncStorage
+2. **Check-in duration:** 3 hours (typical game length)
+3. **Court photos:** Post-MVP (reduces launch complexity)
+4. **Web support:** No, mobile-only
+5. **Court limit:** 1000 per query (covers full Atlanta metro)
+6. **Clustering radius:** 30px (less aggressive than default 50px)
+7. **Map radius:** Dynamic (half-diagonal of viewport), clamped 5–200km
+8. **City suggestions:** DB courts (proximity-sorted) + Nominatim (location-biased viewbox)
 
 ### Open Questions
 1. How do we handle spam/fake check-ins? (Post-MVP: rate limiting)
-2. Should check-ins be visible on map pins? (Nice to have)
-3. What analytics events should we track? (TBD)
+2. What analytics events should we track? (TBD)
+3. Expand to other cities: user-driven or curated? (TBD)
 
 ---
 
 ## References
 
-- **MVP Launch Plan:** See `MVP_Launch_Plan.md` for timeline and budget
+- **MVP Launch Plan:** `MVP_Launch_Plan.md`
 - **Supabase Docs:** https://supabase.com/docs
 - **Expo Docs:** https://docs.expo.dev
 - **NativeWind Docs:** https://www.nativewind.dev
+- **Maestro Docs:** https://maestro.mobile.dev
 
 ---
 
@@ -1008,9 +679,7 @@ A feature is considered "done" when:
 When implementing features:
 1. Read this spec for requirements
 2. Check existing code in `src/services/` and `app/`
-3. Follow code style guidelines
-4. Test on both iOS and Android
-5. Update this spec if requirements change
-6. Ask user for clarification on ambiguous requirements
-
-This is a living document. Update it as the product evolves.
+3. Follow code style guidelines above
+4. Test on iOS simulator minimum, physical device before major releases
+5. Use `CI=1 eas update` for OTA-eligible changes (JS only)
+6. Update this spec when features ship or requirements change

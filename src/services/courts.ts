@@ -145,7 +145,7 @@ export async function listCourtsNearby(
       lat,
       lon,
       radius_meters: radiusMeters,
-      limit_count: 100,
+      limit_count: 1000,
     });
 
     if (error) {

@@ -18,14 +18,15 @@ type CourtsMapProps = {
 type CourtFeature = Supercluster.PointFeature<{ courtId: string; isHot: boolean }>;
 
 function regionToZoom(region: Region): number {
-  return Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
+  const zoom = Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
+  return Math.min(Math.max(zoom, 0), 20);
 }
 
 function regionToBBox(region: Region): [number, number, number, number] {
-  const w = region.longitude - region.longitudeDelta / 2;
-  const s = region.latitude - region.latitudeDelta / 2;
-  const e = region.longitude + region.longitudeDelta / 2;
-  const n = region.latitude + region.latitudeDelta / 2;
+  const w = Math.max(region.longitude - region.longitudeDelta / 2, -180);
+  const s = Math.max(region.latitude - region.latitudeDelta / 2, -85);
+  const e = Math.min(region.longitude + region.longitudeDelta / 2, 180);
+  const n = Math.min(region.latitude + region.latitudeDelta / 2, 85);
   return [w, s, e, n];
 }
 
@@ -66,7 +67,7 @@ export function CourtsMap({
   // Build supercluster index whenever courts or activity changes
   const supercluster = useMemo(() => {
     const sc = new Supercluster<{ courtId: string; isHot: boolean }>({
-      radius: 50,
+      radius: 30,
       maxZoom: 16,
     });
 
