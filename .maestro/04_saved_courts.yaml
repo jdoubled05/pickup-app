@@ -1,0 +1,73 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - saved
+---
+# Save a court, verify it appears in saved list, then unsave
+
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+- tapOn:
+    id: "courts-tab"
+- waitForAnimationToEnd
+
+# Clear any persisted filters
+- tapOn:
+    id: "filter-button"
+- extendedWaitUntil:
+    visible: "COURT TYPE"
+    timeout: 8000
+- runFlow:
+    when:
+      visible: "Clear all filters"
+    commands:
+      - tapOn: "Clear all filters"
+      - waitForAnimationToEnd
+- tapOn: "Close filters"
+- waitForAnimationToEnd
+
+# Tap first court card
+- tapOn:
+    point: "50%, 35%"
+- waitForAnimationToEnd
+- assertVisible: "Check in at this court"
+
+# Save it
+- tapOn:
+    id: "save-button"
+- waitForAnimationToEnd
+- assertVisible: "⭐ Saved"
+- tapOn: "Go back"
+- waitForAnimationToEnd
+
+# Navigate to Profile → Saved Courts
+- tapOn:
+    id: "profile-tab"
+- waitForAnimationToEnd
+- tapOn:
+    id: "saved-courts-button"
+- waitForAnimationToEnd
+
+# Saved court should appear — tap it
+- tapOn:
+    point: "50%, 35%"
+- waitForAnimationToEnd
+- assertVisible: "Check in at this court"
+
+# Unsave from detail
+- tapOn:
+    id: "save-button"
+- waitForAnimationToEnd
+- tapOn: "Go back"
+- waitForAnimationToEnd
+
+# Saved list should now be empty
+- extendedWaitUntil:
+    visible:
+      id: "empty-saved-courts"
+    timeout: 5000

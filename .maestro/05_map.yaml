@@ -1,0 +1,59 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - map
+  - smoke
+---
+# Map: open, search city, verify courts load, recenter, refresh
+
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+- waitForAnimationToEnd
+
+# Switch to Map tab
+- tapOn:
+    id: "map-tab"
+- extendedWaitUntil:
+    visible: "Search courts or a location..."
+    timeout: 15000
+
+# Search for a city
+- tapOn: "Search courts or a location..."
+- inputText: "Duluth"
+- waitForAnimationToEnd
+
+# Suggestion should appear
+- extendedWaitUntil:
+    visible: "Duluth"
+    timeout: 5000
+- tapOn: "Duluth, GA"
+- waitForAnimationToEnd
+
+# Map should have recentered
+- assertVisible: "Search courts or a location..."
+
+# Wait for courts to finish loading before tapping Refresh/Recenter
+- extendedWaitUntil:
+    visible:
+      id: "refresh-button"
+    timeout: 15000
+
+# Recenter to device location
+- tapOn:
+    id: "recenter-button"
+- waitForAnimationToEnd
+
+# Refresh courts
+- extendedWaitUntil:
+    visible:
+      id: "refresh-button"
+    timeout: 10000
+- tapOn:
+    id: "refresh-button"
+- waitForAnimationToEnd

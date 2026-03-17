@@ -120,7 +120,7 @@ export default function SavedCourtsScreen() {
           </View>
         </View>
       ) : savedCourts.length === 0 ? (
-        <View className="mt-6">
+        <View className="mt-6" testID="empty-saved-courts">
           <Text className="text-gray-500 dark:text-white/60">
             No saved courts yet. Save a court from its detail screen.
           </Text>

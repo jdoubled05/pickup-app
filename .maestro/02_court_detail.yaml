@@ -1,0 +1,78 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - courts
+  - checkin
+  - smoke
+---
+# Court detail: view info, check in, save, get directions
+
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+- tapOn:
+    id: "courts-tab"
+- waitForAnimationToEnd
+
+# Clear any persisted filters from previous runs
+- tapOn:
+    id: "filter-button"
+- extendedWaitUntil:
+    visible: "COURT TYPE"
+    timeout: 10000
+- runFlow:
+    when:
+      visible: "Clear all filters"
+    commands:
+      - tapOn: "Clear all filters"
+      - waitForAnimationToEnd
+- tapOn: "Close filters"
+- waitForAnimationToEnd
+
+# Tap first court card
+- tapOn:
+    point: "50%, 35%"
+- waitForAnimationToEnd
+
+# Detail page should show action buttons
+- assertVisible:
+    id: "checkin-button"
+- assertVisible:
+    id: "directions-button"
+- assertVisible:
+    id: "save-button"
+
+# Save the court
+- tapOn:
+    id: "save-button"
+- waitForAnimationToEnd
+- assertVisible: "⭐ Saved"
+
+# Unsave
+- tapOn:
+    id: "save-button"
+- waitForAnimationToEnd
+
+# Check in
+- tapOn:
+    id: "checkin-button"
+- extendedWaitUntil:
+    visible: "Check out from this court"
+    timeout: 10000
+
+# Check out
+- tapOn:
+    id: "checkin-button"
+- waitForAnimationToEnd
+
+# Verify directions button still present
+- assertVisible:
+    id: "directions-button"
+
+# Go back
+- tapOn: "Go back"
+- assertVisible: "Search courts..."

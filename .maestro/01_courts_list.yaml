@@ -1,0 +1,41 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - courts
+  - smoke
+---
+# Courts list: load, scroll, search, navigate to detail
+
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+
+# Wait for courts to load from API
+- waitForAnimationToEnd
+
+# Scroll down to verify list renders
+- scroll
+
+# Search by court name
+- tapOn: "Search courts..."
+- inputText: "Park"
+- waitForAnimationToEnd
+- assertVisible: "Park"
+
+# Clear search and dismiss keyboard by tapping header area
+- eraseText: 4
+- tapOn:
+    point: "50%, 8%"
+- waitForAnimationToEnd
+
+# Tap first visible court card
+- tapOn:
+    point: "50%, 35%"
+- waitForAnimationToEnd
+- assertVisible:
+    id: "directions-button"
+- tapOn: "Go back"

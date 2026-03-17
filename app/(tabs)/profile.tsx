@@ -102,6 +102,7 @@ export default function ProfileScreen() {
             icon={<Ionicons name="bookmark" size={20} color={iconColor} />}
             accessibilityLabel={`View saved courts, ${savedCount} saved`}
             accessibilityRole="button"
+            testID="saved-courts-button"
           />
         </Link>
       </View>

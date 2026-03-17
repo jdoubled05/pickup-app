@@ -1,6 +1,6 @@
 import { Tabs } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Platform, useColorScheme } from "react-native";
+import { Platform, Pressable, useColorScheme } from "react-native";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -31,6 +31,7 @@ export default function TabLayout() {
         name="courts"
         options={{
           title: "Courts",
+          tabBarButton: (props) => <Pressable {...props} testID="courts-tab" />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="basketball-outline" size={size} color={color} />
           ),
@@ -40,6 +41,7 @@ export default function TabLayout() {
         name="map"
         options={{
           title: "Map",
+          tabBarButton: (props) => <Pressable {...props} testID="map-tab" />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map-outline" size={size} color={color} />
           ),
@@ -49,6 +51,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "Profile",
+          tabBarButton: (props) => <Pressable {...props} testID="profile-tab" />,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

@@ -1,0 +1,53 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - onboarding
+---
+# Clears app data so onboarding shows fresh, then verifies the full flow.
+
+- clearState
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- waitForAnimationToEnd
+# Dismiss developer menu (always appears after clearState on Expo dev client)
+- tapOn: "Continue"
+- waitForAnimationToEnd
+# Dismiss Expo developer tools panel if it appeared (tap backdrop above panel)
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "50%, 20%"
+      - waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      text: "Welcome to Pickup"
+    timeout: 30000
+
+# Swipe through all 5 onboarding slides
+- swipe:
+    direction: LEFT
+    duration: 400
+- waitForAnimationToEnd
+- swipe:
+    direction: LEFT
+    duration: 400
+- waitForAnimationToEnd
+- swipe:
+    direction: LEFT
+    duration: 400
+- waitForAnimationToEnd
+- swipe:
+    direction: LEFT
+    duration: 400
+- waitForAnimationToEnd
+
+# Final slide — tap Get Started
+- tapOn:
+    text: "Get Started"
+- waitForAnimationToEnd
+
+# Should land on Courts tab
+- assertVisible: "Search courts..."

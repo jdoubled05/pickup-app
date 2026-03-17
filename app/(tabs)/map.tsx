@@ -95,13 +95,14 @@ export default function MapsTest() {
   const [filterModalVisible, setFilterModalVisible] = React.useState(false);
   const searchInputRef = useRef<TextInput>(null);
   const regionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks programmatic region changes (recenter/search) to skip auto-fetch
   const skipRegionFetchRef = useRef(0);
   // Tracks current viewport center for manual refresh without causing re-renders
   const viewportCenterRef = useRef(center);
 
-  const fetchCourts = React.useCallback(async (coords: { lat: number; lon: number }) => {
-    const data = await listCourtsNearby(coords.lat, coords.lon, 50000);
+  const fetchCourts = React.useCallback(async (coords: { lat: number; lon: number }, radiusMeters = 50000) => {
+    const data = await listCourtsNearby(coords.lat, coords.lon, radiusMeters);
     setCourts(data);
 
     // Fetch activity data for all courts
@@ -207,9 +208,13 @@ export default function MapsTest() {
     regionDebounceRef.current = setTimeout(async () => {
       const coords = { lat: region.latitude, lon: region.longitude };
       viewportCenterRef.current = coords;
+      // Compute radius as the half-diagonal of the visible viewport, clamped to 5–200 km
+      const latM = (region.latitudeDelta / 2) * 111000;
+      const lonM = (region.longitudeDelta / 2) * 111000 * Math.cos(region.latitude * (Math.PI / 180));
+      const radiusMeters = Math.min(Math.max(Math.sqrt(latM * latM + lonM * lonM), 5000), 200000);
       setMapRefreshing(true);
       try {
-        await fetchCourts(coords);
+        await fetchCourts(coords, radiusMeters);
       } finally {
         setMapRefreshing(false);
       }
@@ -261,7 +266,7 @@ export default function MapsTest() {
       return;
     }
     const timer = setTimeout(async () => {
-      const results = await autocompleteCities(q);
+      const results = await autocompleteCities(q, center);
       setCitySuggestions(results);
     }, 500);
     return () => clearTimeout(timer);
@@ -289,7 +294,7 @@ export default function MapsTest() {
       ? [...suggestionResults, ...courts]
       : courts;
     const seen = new Set<string>();
-    const results: CitySuggestion[] = [];
+    const results: Array<CitySuggestion & { distSq: number }> = [];
     for (const c of source) {
       if (!c.city || typeof c.latitude !== 'number' || typeof c.longitude !== 'number') continue;
       if (!c.city.toLowerCase().includes(q)) continue;
@@ -299,18 +304,21 @@ export default function MapsTest() {
       const stateRaw = c.state ?? '';
       const stateAbbrev = STATE_ABBREVS[stateRaw.toLowerCase()] ?? stateRaw;
       const displayName = stateAbbrev ? `${c.city}, ${stateAbbrev}` : c.city;
-      results.push({ displayName, description: displayName, coords: { lat: c.latitude, lon: c.longitude } });
+      const dlat = c.latitude - center.lat;
+      const dlon = c.longitude - center.lon;
+      results.push({ displayName, description: displayName, coords: { lat: c.latitude, lon: c.longitude }, distSq: dlat * dlat + dlon * dlon });
     }
-    return results.slice(0, 3);
-  }, [searchText, searchFocused, courts, suggestionResults]);
+    return results.sort((a, b) => a.distSq - b.distSq).slice(0, 3).map(({ distSq: _d, ...rest }) => rest);
+  }, [searchText, searchFocused, courts, suggestionResults, center]);
 
   // Combined: DB cities first (instant), Nominatim fills slots for cities not in DB
   // Dedup by base city name so "Duluth, MN" is excluded if DB has "Duluth, GA"
   const combinedCitySuggestions = React.useMemo((): CitySuggestion[] => {
+    if (!searchFocused) return [];
     const dbBaseNames = new Set(dbCitySuggestions.map((c) => c.displayName.split(',')[0].trim().toLowerCase()));
     const extra = citySuggestions.filter((c) => !dbBaseNames.has(c.displayName.split(',')[0].trim().toLowerCase()));
     return [...dbCitySuggestions, ...extra].slice(0, 3);
-  }, [dbCitySuggestions, citySuggestions]);
+  }, [searchFocused, dbCitySuggestions, citySuggestions]);
 
   // Court name/address matches from DB
   const mapCourtSuggestions = React.useMemo(() => {
@@ -385,8 +393,19 @@ export default function MapsTest() {
               ref={searchInputRef}
               value={searchText}
               onChangeText={setSearchText}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              onFocus={() => {
+                if (blurTimerRef.current) {
+                  clearTimeout(blurTimerRef.current);
+                  blurTimerRef.current = null;
+                }
+                setSearchFocused(true);
+              }}
+              onBlur={() => {
+                blurTimerRef.current = setTimeout(() => {
+                  blurTimerRef.current = null;
+                  setSearchFocused(false);
+                }, 150);
+              }}
               onSubmitEditing={handleLocationSearch}
               placeholder="Search courts or a location..."
               placeholderTextColor={isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.3)'}
@@ -416,6 +435,7 @@ export default function MapsTest() {
           {/* Filter button */}
           <Pressable
             onPress={() => setFilterModalVisible(true)}
+            testID="filter-button"
             accessibilityLabel={hasActiveFilters(filters) ? 'Open filters, filters active' : 'Open filters'}
             accessibilityRole="button"
             style={{
@@ -447,7 +467,7 @@ export default function MapsTest() {
         </View>
 
         {/* Suggestions dropdown — cities then courts */}
-        {(combinedCitySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
+        {searchFocused && (combinedCitySuggestions.length > 0 || mapCourtSuggestions.length > 0) && (
           <View
             style={{
               marginTop: 6,
@@ -471,12 +491,16 @@ export default function MapsTest() {
                   onPress={() => {
                     setSearchText(city.displayName);
                     setSearchFocused(false);
+                    setSuggestionResults(null);
+                    setCitySuggestions([]);
                     searchInputRef.current?.blur();
                     setCenter(city.coords);
                     skipRegionFetchRef.current += 1;
                     setRecenterSignal((v) => v + 1);
                     fetchCourts(city.coords);
                   }}
+                  accessibilityLabel={city.displayName}
+                  accessibilityRole="button"
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -503,6 +527,8 @@ export default function MapsTest() {
                 onPress={() => {
                   setSearchText(court.name);
                   setSearchFocused(false);
+                  setSuggestionResults(null);
+                  setCitySuggestions([]);
                   searchInputRef.current?.blur();
                   if (typeof court.latitude === 'number' && typeof court.longitude === 'number') {
                     const coords = { lat: court.latitude, lon: court.longitude };
@@ -590,6 +616,7 @@ export default function MapsTest() {
               }
             }}
             accessibilityLabel="Refresh courts on map"
+            testID="refresh-button"
           />
           <Button
             title={recenterLoading ? "Recentering..." : "Recenter"}
@@ -597,6 +624,7 @@ export default function MapsTest() {
             onPress={handleRecenter}
             disabled={recenterLoading}
             accessibilityLabel="Recenter map to your location"
+            testID="recenter-button"
           />
         </View>
         <Text className="mt-2 text-gray-500 dark:text-white/60">

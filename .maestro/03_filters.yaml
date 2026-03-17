@@ -1,0 +1,47 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - filters
+  - smoke
+---
+# Filters: apply indoor filter, verify, clear
+
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+- tapOn:
+    id: "courts-tab"
+- waitForAnimationToEnd
+
+# Open filter modal
+- tapOn:
+    id: "filter-button"
+- extendedWaitUntil:
+    visible: "COURT TYPE"
+    timeout: 10000
+
+# Select Indoor
+- tapOn: "Filter for indoor courts only"
+- waitForAnimationToEnd
+
+# Apply filters
+- tapOn: "Apply filters"
+- waitForAnimationToEnd
+
+# Back on courts list with filter active
+- assertVisible: "Search courts..."
+
+# Open again and clear
+- tapOn:
+    id: "filter-button"
+- waitForAnimationToEnd
+- tapOn: "Clear all filters"
+- waitForAnimationToEnd
+
+# No active filters — button label is "Close filters"
+- tapOn: "Close filters"
+- waitForAnimationToEnd

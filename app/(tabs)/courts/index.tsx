@@ -491,6 +491,7 @@ export default function CourtsIndex() {
                 await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setFilterModalVisible(true);
               }}
+              testID="filter-button"
               className={`flex-row items-center rounded-full px-4 py-2 ${
                 hasActiveFilters(filters)
                   ? 'bg-brand'

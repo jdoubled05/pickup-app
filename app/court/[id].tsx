@@ -390,6 +390,7 @@ export default function CourtDetails() {
             {supabaseStatus.configured && (
               <Pressable
                 onPress={handleToggleCheckIn}
+                testID="checkin-button"
                 disabled={checkInLoading}
                 className={`mb-3 rounded-2xl py-4 ${
                   isUserCheckedIn
@@ -424,6 +425,7 @@ export default function CourtDetails() {
             <View className="flex-row">
               <Pressable
                 onPress={handleGetDirections}
+                testID="directions-button"
                 className="mr-3 flex-1 items-center py-3"
                 accessibilityLabel={`Get directions to ${court.name}`}
                 accessibilityRole="button"
@@ -468,6 +470,7 @@ export default function CourtDetails() {
                   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   toggleSavedCourt(court.id);
                 }}
+                testID="save-button"
                 className="flex-1 items-center py-3"
                 accessibilityLabel={saved ? `Remove ${court.name} from saved courts` : `Save ${court.name} to favorites`}
                 accessibilityRole="button"
