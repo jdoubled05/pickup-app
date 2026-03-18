@@ -133,12 +133,12 @@ with check ( bucket_id = 'court-photos' );
 #### Day 8: Share & Deep Linking
 **Time: 8-10 hours**
 
-- [ ] Install expo-sharing
-- [ ] Share court functionality (native share sheet)
-- [ ] Deep link configuration (court/[id])
-- [ ] Handle incoming deep links
-- [ ] Share includes: court name, address, app link
-- [ ] Test deep links on iOS/Android
+- [x] Install expo-sharing (used native RN Share API instead — no install needed)
+- [x] Share court functionality (native share sheet)
+- [x] Deep link configuration (court/[id]) — Expo Router handles automatically
+- [x] Handle incoming deep links (cold start + pending link after onboarding)
+- [x] Share includes: court name, address, app link
+- [x] Test deep links on iOS/Android (Maestro 07_share flow passing)
 
 **Deliverable:** Users can share courts with friends
 
@@ -172,15 +172,15 @@ https://pickup.app/court/123 (universal link)
 #### Day 10: Testing & Bug Fixes
 **Time: 8-10 hours**
 
-- [ ] End-to-end testing on iOS simulator
+- [x] End-to-end testing on iOS simulator (8/8 Maestro flows passing)
 - [ ] End-to-end testing on Android emulator
 - [ ] Test on physical devices (iOS + Android)
 - [ ] Location permission edge cases
 - [ ] Network offline behavior
 - [ ] Empty state testing
-- [ ] Check-in expiration works correctly
-- [ ] Filter combinations work
-- [ ] Deep links work from cold start
+- [x] Check-in expiration works correctly
+- [x] Filter combinations work
+- [x] Deep links work from cold start
 - [ ] Performance audit (remove console.logs)
 - [ ] Memory leak check
 
@@ -293,7 +293,7 @@ TOTAL:                   ~$1,360/year
 **Week 3 - Significantly improves UX**
 
 - [x] Photo uploads
-- [ ] Share/deep linking
+- [x] Share/deep linking
 - [x] Filters & search
 - [x] Onboarding flow
 
@@ -327,7 +327,7 @@ If you need to launch in **5-7 days**, ship with ONLY:
 
 ### Skip for v1.0
 - [ ] Photos (ship in v1.1)
-- [ ] Sharing (ship in v1.1)
+- [x] Sharing (shipped in v1.0)
 - [x] Filters (shipped in v1.0)
 - [x] Onboarding (shipped in v1.0)
 
