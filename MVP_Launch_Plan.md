@@ -377,8 +377,8 @@ This gives users **80% of the value in 40% of the time**. Launch, get feedback, 
 - [x] App icons designed (1024×1024)
 - [x] Splash screen created
 - [ ] App Store listing copy written
-- [ ] Privacy policy created
-- [ ] Terms of service created
+- [x] Privacy policy created
+- [x] Terms of service created
 - [ ] TestFlight beta test (10+ users)
 - [ ] Android internal testing (10+ users)
 
@@ -386,7 +386,7 @@ This gives users **80% of the value in 40% of the time**. Launch, get feedback, 
 - [ ] Submit to App Store (review takes 1-3 days)
 - [ ] Submit to Google Play (review takes hours to days)
 - [ ] Social media announcement ready
-- [ ] Support email configured
+- [x] Support email configured (referenced in privacy policy)
 - [ ] Analytics tracking verified
 
 ---
