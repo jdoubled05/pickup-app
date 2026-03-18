@@ -455,6 +455,7 @@ export default function CourtDetails() {
 
               <Pressable
                 onPress={handleShare}
+                testID="share-button"
                 className="mr-3 flex-1 items-center py-3"
                 accessibilityLabel={`Share ${court.name}`}
                 accessibilityRole="button"

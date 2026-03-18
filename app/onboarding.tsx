@@ -13,6 +13,8 @@ import * as Location from "expo-location";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
 import { markOnboardingComplete } from "@/src/services/onboarding";
+import { consumePendingDeepLink } from "@/src/services/pendingDeepLink";
+import * as Linking from "expo-linking";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -87,6 +89,14 @@ export default function OnboardingScreen() {
 
   const finish = async () => {
     await markOnboardingComplete();
+    const pendingUrl = consumePendingDeepLink();
+    if (pendingUrl) {
+      const parsed = Linking.parse(pendingUrl);
+      if (parsed.path) {
+        router.replace(`/${parsed.path}` as Parameters<typeof router.replace>[0]);
+        return;
+      }
+    }
     router.replace("/(tabs)/courts");
   };
 

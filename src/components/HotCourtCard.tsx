@@ -102,6 +102,7 @@ export function HotCourtCard({ court, checkInsCount, index, weather }: HotCourtC
           styles.container,
           pressed && styles.pressed,
         ]}
+        testID="court-card"
         className="mb-3 overflow-hidden rounded-2xl border border-brand/40 bg-brand/10"
         accessibilityLabel={`${court.name}, ${checkInsCount} ${checkInsCount === 1 ? 'player' : 'players'} checked in, ${distance || 'nearby'}`}
         accessibilityRole="button"

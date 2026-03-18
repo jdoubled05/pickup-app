@@ -16,6 +16,7 @@ tags:
 - waitForAnimationToEnd
 - tapOn:
     id: "map-tab"
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       text: "Search courts or a location..."

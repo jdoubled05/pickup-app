@@ -4,10 +4,12 @@ import { Stack, useRouter } from "expo-router";
 import { Pressable, useColorScheme } from "react-native";
 import { useEffect } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
 import { AppShell } from "@/src/components/AppShell";
 import { configureNotificationHandler } from "@/src/services/notifications";
 import { hasCompletedOnboarding } from "@/src/services/onboarding";
+import { setPendingDeepLink } from "@/src/services/pendingDeepLink";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -18,10 +20,20 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  // Show onboarding on first launch
+  // Show onboarding on first launch; capture any deep link that arrived first
   useEffect(() => {
-    hasCompletedOnboarding().then((completed) => {
+    Promise.all([
+      hasCompletedOnboarding(),
+      Linking.getInitialURL(),
+    ]).then(([completed, initialUrl]) => {
       if (!completed) {
+        // Store the deep link so onboarding can navigate there on finish
+        if (initialUrl) {
+          const parsed = Linking.parse(initialUrl);
+          if (parsed.path?.startsWith('court/')) {
+            setPendingDeepLink(initialUrl);
+          }
+        }
         router.replace("/onboarding");
       }
     });

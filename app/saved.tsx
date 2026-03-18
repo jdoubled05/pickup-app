@@ -130,10 +130,12 @@ export default function SavedCourtsScreen() {
           {savedCourts.map((court) => (
             <View
               key={court.id}
+              testID="saved-court-item"
               className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 p-4"
             >
               <Pressable
                 onPress={() => router.push(`/court/${court.id}`)}
+                testID="saved-court-pressable"
                 accessibilityLabel={`View details for ${court.name}, ${court.address}`}
                 accessibilityRole="button"
               >

@@ -34,7 +34,7 @@ tags:
 
 # Tap first visible court card
 - tapOn:
-    point: "50%, 35%"
+    id: "court-card"
 - waitForAnimationToEnd
 - assertVisible:
     id: "directions-button"

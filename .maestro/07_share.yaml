@@ -1,13 +1,14 @@
 appId: com.simbasghost.pickupnativewindclean
 tags:
-  - saved
+  - share
 ---
-# Save a court, verify it appears in saved list, then unsave
+# Share a court via native share sheet, then dismiss
 
 - launchApp
 - waitForAnimationToEnd
 - waitForAnimationToEnd
 - openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- waitForAnimationToEnd
 - extendedWaitUntil:
     visible:
       text: "Search courts..."
@@ -37,41 +38,18 @@ tags:
 - waitForAnimationToEnd
 - assertVisible: "Check in at this court"
 
-# Save it
+# Tap share button — native share sheet should appear
 - tapOn:
-    id: "save-button"
-- waitForAnimationToEnd
-- assertVisible: "⭐ Saved"
-- tapOn: "Go back"
-- waitForAnimationToEnd
-
-# Navigate to Profile → Saved Courts
-- tapOn:
-    id: "profile-tab"
-- waitForAnimationToEnd
-- tapOn:
-    id: "saved-courts-button"
-- waitForAnimationToEnd
-
-# Wait for saved court card to load, then tap it
+    id: "share-button"
 - extendedWaitUntil:
-    visible:
-      id: "saved-court-pressable"
-    timeout: 10000
-- tapOn:
-    id: "saved-court-pressable"
-- waitForAnimationToEnd
-- assertVisible: "Check in at this court"
-
-# Unsave from detail
-- tapOn:
-    id: "save-button"
-- waitForAnimationToEnd
-- tapOn: "Go back"
-- waitForAnimationToEnd
-
-# Saved list should now be empty
-- extendedWaitUntil:
-    visible:
-      id: "empty-saved-courts"
+    visible: "Copy"
     timeout: 5000
+
+# Dismiss share sheet by swiping down
+- swipe:
+    direction: DOWN
+    duration: 400
+- waitForAnimationToEnd
+
+# Still on court detail
+- assertVisible: "Check in at this court"

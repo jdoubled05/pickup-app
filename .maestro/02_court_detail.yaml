@@ -35,7 +35,7 @@ tags:
 
 # Tap first court card
 - tapOn:
-    point: "50%, 35%"
+    id: "court-card"
 - waitForAnimationToEnd
 
 # Detail page should show action buttons

@@ -33,6 +33,7 @@ export function CourtCard({ court, index, weather }: CourtCardProps) {
           styles.container,
           pressed && styles.pressed,
         ]}
+        testID="court-card"
         className={`mb-3 overflow-hidden rounded-2xl border bg-gray-100 dark:bg-gray-900 ${
           isIndoor ? 'border-secondary/30' : 'border-court/30'
         }`}
