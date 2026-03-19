@@ -50,3 +50,4 @@ privacy-site/
 
 # macOS
 .DS_Store
+.mcp.json
