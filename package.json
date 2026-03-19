@@ -16,7 +16,8 @@
     "seed-data": "tsx scripts/seed-test-data.ts",
     "create-checkins": "tsx scripts/create-demo-checkins.ts",
     "notion:push": "node scripts/notion-sync.mjs push",
-    "notion:pull": "node scripts/notion-sync.mjs pull"
+    "notion:pull": "node scripts/notion-sync.mjs pull",
+    "notion:descriptions": "node scripts/notion-sync.mjs update-descriptions"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
