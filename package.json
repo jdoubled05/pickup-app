@@ -17,7 +17,8 @@
     "create-checkins": "tsx scripts/create-demo-checkins.ts",
     "notion:push": "node scripts/notion-sync.mjs push",
     "notion:pull": "node scripts/notion-sync.mjs pull",
-    "notion:descriptions": "node scripts/notion-sync.mjs update-descriptions"
+    "notion:descriptions": "node scripts/notion-sync.mjs update-descriptions",
+    "notion:types": "node scripts/notion-sync.mjs update-types"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

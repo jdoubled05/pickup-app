@@ -219,6 +219,47 @@ function buildPageBlocks(item, meta) {
 // Notion helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Item type classifier
+// ---------------------------------------------------------------------------
+
+function classifyItem(item) {
+  const text = item.text.toLowerCase();
+  const section = item.section.toLowerCase();
+  const subsection = item.subsection.toLowerCase();
+
+  // Questions (end with ?) → Admin
+  if (item.text.trim().endsWith('?')) return 'Admin';
+
+  // Success Metrics → Admin (tracking, not doing)
+  if (section.endsWith('post-launch') || section.includes('month 1') || section.includes('month 3')) {
+    return 'Admin';
+  }
+
+  // Technical Setup: pre-development & during development → Admin (config/infra)
+  if (section === 'pre-development' || section === 'during development') return 'Admin';
+
+  // Pre-Launch → Admin, except TestFlight/beta → Testing
+  if (section === 'pre-launch') {
+    if (text.includes('testflight') || text.includes('android internal') || text.includes('beta test')) {
+      return 'Testing';
+    }
+    return 'Admin';
+  }
+
+  // Launch Day → Admin
+  if (section === 'launch day') return 'Admin';
+
+  // Testing & Bug Fixes subsection → Testing, except items that need code changes
+  if (subsection === 'testing & bug fixes') {
+    if (text.includes('performance audit') || text.includes('memory leak')) return 'Code';
+    return 'Testing';
+  }
+
+  // Everything else (development timeline, phase 1/2/3, fast-track) → Code
+  return 'Code';
+}
+
 async function ensureSchema() {
   try {
     await notion.databases.update({
@@ -227,6 +268,15 @@ async function ensureSchema() {
         Done: { checkbox: {} },
         Section: { select: {} },
         Subsection: { select: {} },
+        Type: {
+          select: {
+            options: [
+              { name: 'Code', color: 'blue' },
+              { name: 'Testing', color: 'yellow' },
+              { name: 'Admin', color: 'gray' },
+            ],
+          },
+        },
       },
     });
   } catch (e) {
@@ -284,6 +334,7 @@ async function push() {
           Done: { checkbox: item.checked },
           Section: { select: { name: item.section } },
           Subsection: { select: { name: item.subsection } },
+          Type: { select: { name: classifyItem(item) } },
         },
         children: buildPageBlocks(item, meta),
       });
@@ -310,6 +361,7 @@ async function push() {
           Done: { checkbox: item.checked },
           Section: { select: { name: item.section } },
           Subsection: { select: { name: item.subsection } },
+          Type: { select: { name: classifyItem(item) } },
         },
         children: buildPageBlocks(item, meta),
       });
@@ -399,6 +451,34 @@ async function updateDescriptions() {
 }
 
 // ---------------------------------------------------------------------------
+// Update types: backfill Type property on all existing pages
+// ---------------------------------------------------------------------------
+
+async function updateTypes() {
+  console.log('🏷️  Updating Type property on all pages');
+  await ensureSchema();
+
+  const content = readFileSync(MD_PATH, 'utf8');
+  const { items } = parseMarkdown(content);
+
+  const withIds = items.filter(i => i.notionPageId);
+  let count = 0;
+
+  for (const item of withIds) {
+    const type = classifyItem(item);
+    await notion.pages.update({
+      page_id: item.notionPageId,
+      properties: { Type: { select: { name: type } } },
+    });
+    count++;
+    process.stdout.write(`\r  ✓ Updated ${count}/${withIds.length} (${item.text.slice(0, 40)}...)`);
+    await sleep(350);
+  }
+
+  console.log('\n  ✓ All types updated');
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
@@ -409,7 +489,9 @@ if (mode === 'push') {
   pull().catch(err => { console.error(err); process.exit(1); });
 } else if (mode === 'update-descriptions') {
   updateDescriptions().catch(err => { console.error(err); process.exit(1); });
+} else if (mode === 'update-types') {
+  updateTypes().catch(err => { console.error(err); process.exit(1); });
 } else {
-  console.error('Usage: node scripts/notion-sync.mjs push|pull|update-descriptions');
+  console.error('Usage: node scripts/notion-sync.mjs push|pull|update-descriptions|update-types');
   process.exit(1);
 }
