@@ -261,13 +261,13 @@ function classifyItem(item) {
 }
 
 async function ensureSchema() {
+  // Only add new properties — never pass existing select properties with empty
+  // options or Notion will clear their values on all pages.
   try {
     await notion.databases.update({
       database_id: NOTION_DATABASE_ID,
       properties: {
         Done: { checkbox: {} },
-        Section: { select: {} },
-        Subsection: { select: {} },
         Type: {
           select: {
             options: [
@@ -451,6 +451,36 @@ async function updateDescriptions() {
 }
 
 // ---------------------------------------------------------------------------
+// Repair: re-populate Section, Subsection, and Type on all existing pages
+// ---------------------------------------------------------------------------
+
+async function repair() {
+  console.log('🔧 Repairing Section, Subsection, and Type on all pages');
+
+  const content = readFileSync(MD_PATH, 'utf8');
+  const { items } = parseMarkdown(content);
+
+  const withIds = items.filter(i => i.notionPageId);
+  let count = 0;
+
+  for (const item of withIds) {
+    await notion.pages.update({
+      page_id: item.notionPageId,
+      properties: {
+        Section: { select: { name: item.section } },
+        Subsection: { select: { name: item.subsection } },
+        Type: { select: { name: classifyItem(item) } },
+      },
+    });
+    count++;
+    process.stdout.write(`\r  ✓ Repaired ${count}/${withIds.length}`);
+    await sleep(350);
+  }
+
+  console.log('\n  ✓ All pages repaired');
+}
+
+// ---------------------------------------------------------------------------
 // Update types: backfill Type property on all existing pages
 // ---------------------------------------------------------------------------
 
@@ -491,7 +521,9 @@ if (mode === 'push') {
   updateDescriptions().catch(err => { console.error(err); process.exit(1); });
 } else if (mode === 'update-types') {
   updateTypes().catch(err => { console.error(err); process.exit(1); });
+} else if (mode === 'repair') {
+  repair().catch(err => { console.error(err); process.exit(1); });
 } else {
-  console.error('Usage: node scripts/notion-sync.mjs push|pull|update-descriptions|update-types');
+  console.error('Usage: node scripts/notion-sync.mjs push|pull|update-descriptions|update-types|repair');
   process.exit(1);
 }

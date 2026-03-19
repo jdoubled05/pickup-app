@@ -18,7 +18,8 @@
     "notion:push": "node scripts/notion-sync.mjs push",
     "notion:pull": "node scripts/notion-sync.mjs pull",
     "notion:descriptions": "node scripts/notion-sync.mjs update-descriptions",
-    "notion:types": "node scripts/notion-sync.mjs update-types"
+    "notion:types": "node scripts/notion-sync.mjs update-types",
+    "notion:repair": "node scripts/notion-sync.mjs repair"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
