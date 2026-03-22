@@ -7,11 +7,9 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "ios": {
-        "bundleIdentifier": "com.simbasghost.pickup.dev"
-      },
       "env": {
-        "EXPO_PUBLIC_ENV": "development"
+        "EXPO_PUBLIC_ENV": "development",
+        "APP_BUNDLE_ID_SUFFIX": ".dev"
       }
     },
     "preview": {
