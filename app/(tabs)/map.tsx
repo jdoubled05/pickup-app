@@ -100,9 +100,13 @@ export default function MapsTest() {
   const skipRegionFetchRef = useRef(0);
   // Tracks current viewport center for manual refresh without causing re-renders
   const viewportCenterRef = useRef(center);
+  // Generation counter — increments on each fetch; stale responses are discarded
+  const fetchGenerationRef = useRef(0);
 
   const fetchCourts = React.useCallback(async (coords: { lat: number; lon: number }, radiusMeters = 50000) => {
+    const generation = ++fetchGenerationRef.current;
     const data = await listCourtsNearby(coords.lat, coords.lon, radiusMeters);
+    if (generation !== fetchGenerationRef.current) return;
     setCourts(data);
 
     // Fetch activity data for all courts
