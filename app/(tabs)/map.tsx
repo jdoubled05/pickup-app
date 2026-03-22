@@ -219,10 +219,11 @@ export default function MapsTest() {
     regionDebounceRef.current = setTimeout(async () => {
       const coords = { lat: region.latitude, lon: region.longitude };
       viewportCenterRef.current = coords;
-      // Compute radius as the half-diagonal of the visible viewport, clamped to 5–200 km
+      // Compute radius as the half-diagonal of the visible viewport.
+      // Minimum 50 km so zooming in never shrinks the fetched area and courts don't vanish.
       const latM = (region.latitudeDelta / 2) * 111000;
       const lonM = (region.longitudeDelta / 2) * 111000 * Math.cos(region.latitude * (Math.PI / 180));
-      const radiusMeters = Math.min(Math.max(Math.sqrt(latM * latM + lonM * lonM), 5000), 200000);
+      const radiusMeters = Math.min(Math.max(Math.sqrt(latM * latM + lonM * lonM), 50000), 200000);
       setMapRefreshing(true);
       try {
         await fetchCourts(coords, radiusMeters);
