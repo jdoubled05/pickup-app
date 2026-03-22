@@ -7,6 +7,25 @@ const ANONYMOUS_USER_ID_KEY = "anonymous_user_id";
 const CURRENT_CHECK_IN_KEY = "current_check_in_court_id";
 
 /**
+ * Returns the authenticated user ID if signed in, otherwise the anonymous device ID.
+ * Use this everywhere instead of getAnonymousUserId() so check-ins are always
+ * attributed to the right identity.
+ */
+export async function getCurrentUserId(): Promise<string> {
+  try {
+    if (supabase) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) return session.user.id;
+    }
+  } catch {
+    // Fall through to anonymous ID
+  }
+  return getAnonymousUserId();
+}
+
+/**
  * Gets or generates an anonymous user ID for check-ins
  * Uses device ID as seed for consistency across app restarts
  */
@@ -72,7 +91,7 @@ export async function checkIn(courtId: string): Promise<CheckIn | null> {
   }
 
   try {
-    const anonymousUserId = await getAnonymousUserId();
+    const userId = await getCurrentUserId();
 
     // Remove any existing check-ins for this user (enforces one check-in at a time)
     await checkOut();
@@ -80,7 +99,7 @@ export async function checkIn(courtId: string): Promise<CheckIn | null> {
     // Create new check-in
     const checkInData: CheckInInsert = {
       court_id: courtId,
-      anonymous_user_id: anonymousUserId,
+      anonymous_user_id: userId,
     };
 
     const { data, error } = await supabase
@@ -114,13 +133,13 @@ export async function checkOut(): Promise<boolean> {
   }
 
   try {
-    const anonymousUserId = await getAnonymousUserId();
+    const userId = await getCurrentUserId();
 
     // Delete all check-ins for this user
     const { error } = await supabase
       .from("check_ins")
       .delete()
-      .eq("anonymous_user_id", anonymousUserId);
+      .eq("anonymous_user_id", userId);
 
     if (error) {
       console.error("Failed to check out:", error);
@@ -147,13 +166,13 @@ export async function isCheckedInAtCourt(courtId: string): Promise<boolean> {
   }
 
   try {
-    const anonymousUserId = await getAnonymousUserId();
+    const userId = await getCurrentUserId();
 
     const { data, error } = await supabase
       .from("check_ins")
       .select("id")
       .eq("court_id", courtId)
-      .eq("anonymous_user_id", anonymousUserId)
+      .eq("anonymous_user_id", userId)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
 

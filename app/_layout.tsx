@@ -10,6 +10,9 @@ import { AppShell } from "@/src/components/AppShell";
 import { configureNotificationHandler } from "@/src/services/notifications";
 import { hasCompletedOnboarding } from "@/src/services/onboarding";
 import { setPendingDeepLink } from "@/src/services/pendingDeepLink";
+import { AuthProvider } from "@/src/context/AuthContext";
+import { supabase } from "@/src/services/supabase";
+import { setCurrentUser } from "@/src/services/savedCourts";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -39,6 +42,15 @@ export default function RootLayout() {
     });
   }, [router]);
 
+  // Keep savedCourts in sync with auth state
+  useEffect(() => {
+    if (!supabase) return;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Initialize notification handler
   useEffect(() => {
     configureNotificationHandler();
@@ -55,6 +67,7 @@ export default function RootLayout() {
   }, [router]);
 
   return (
+    <AuthProvider>
     <AppShell>
       <Stack
         initialRouteName="(tabs)"
@@ -105,7 +118,9 @@ export default function RootLayout() {
             ),
           }}
         />
+        <Stack.Screen name="sign-in" options={{ headerShown: false, presentation: "modal" }} />
       </Stack>
     </AppShell>
+    </AuthProvider>
   );
 }
