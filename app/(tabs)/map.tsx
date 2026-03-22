@@ -74,6 +74,13 @@ export default function MapsTest() {
       ? { lat: parsedLat, lon: parsedLon }
       : DEFAULT_CENTER;
   });
+  // True once we have the real initial center (device location or focus coords).
+  // Gates map render so it opens at the right place instead of jumping from Atlanta.
+  const [initialCenterReady, setInitialCenterReady] = React.useState(() => {
+    const parsedLat = lat ? parseFloat(lat) : NaN;
+    const parsedLon = lon ? parseFloat(lon) : NaN;
+    return Number.isFinite(parsedLat) && Number.isFinite(parsedLon);
+  });
   const [locationSource, setLocationSource] = React.useState<"device" | "default">(
     "default"
   );
@@ -141,6 +148,7 @@ export default function MapsTest() {
       setCenter(location.coords);
       setLocationSource(location.source);
     }
+    setInitialCenterReady(true);
     skipRegionFetchRef.current += 1;
     setRecenterSignal((v) => v + 1);
     try {
@@ -346,16 +354,22 @@ export default function MapsTest() {
 
   return (
     <View className="flex-1 bg-white dark:bg-black">
-      <MapErrorBoundary>
-        <CourtsMap
-          center={center}
-          courts={mappableCourts}
-          courtActivity={courtActivity}
-          onSelectCourt={handleSelectCourt}
-          recenterSignal={recenterSignal}
-          onRegionChangeComplete={handleMapRegionChangeComplete}
-        />
-      </MapErrorBoundary>
+      {initialCenterReady ? (
+        <MapErrorBoundary>
+          <CourtsMap
+            center={center}
+            courts={mappableCourts}
+            courtActivity={courtActivity}
+            onSelectCourt={handleSelectCourt}
+            recenterSignal={recenterSignal}
+            onRegionChangeComplete={handleMapRegionChangeComplete}
+          />
+        </MapErrorBoundary>
+      ) : (
+        <View className="flex-1 items-center justify-center bg-white dark:bg-black">
+          <ActivityIndicator size="large" color="#960000" />
+        </View>
+      )}
 
       {/* Tap-outside overlay — dismisses keyboard when search is focused */}
       {searchFocused && (
