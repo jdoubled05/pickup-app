@@ -1,0 +1,48 @@
+appId: com.simbasghost.pickupnativewindclean
+---
+- clearState
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+      - waitForAnimationToEnd
+- tapOn: "Continue"
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "50%, 20%"
+      - waitForAnimationToEnd
+
+# Wait for onboarding
+- extendedWaitUntil:
+    visible: "Welcome to Pickup"
+    timeout: 30000
+- waitForAnimationToEnd
+
+# --- SCREENSHOT 6: Onboarding Slide 1 (Welcome) ---
+- takeScreenshot: app-store-assets/screenshots/06-onboarding-welcome
+
+- swipe:
+    direction: LEFT
+    duration: 400
+- waitForAnimationToEnd
+
+# --- SCREENSHOT 7: Onboarding Slide 2 ---
+- takeScreenshot: app-store-assets/screenshots/07-onboarding-checkins
+
+- swipe:
+    direction: LEFT
+    duration: 400
+- waitForAnimationToEnd
+
+# --- SCREENSHOT 8: Onboarding Slide 3 ---
+- takeScreenshot: app-store-assets/screenshots/08-onboarding-discover

@@ -1,0 +1,135 @@
+appId: com.simbasghost.pickupnativewindclean
+---
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Continue"
+    commands:
+      - tapOn: "Continue"
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Reload"
+    commands:
+      - tapOn:
+          point: "50%, 20%"
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Open"
+    commands:
+      - tapOn: "Open"
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      visible: "Skip"
+    commands:
+      - tapOn: "Skip"
+      - waitForAnimationToEnd
+
+# Wait for courts list with real data
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+- tapOn:
+    id: "courts-tab"
+- waitForAnimationToEnd
+
+# Clear any persisted filters
+- tapOn:
+    id: "filter-button"
+- extendedWaitUntil:
+    visible: "COURT TYPE"
+    timeout: 10000
+- runFlow:
+    when:
+      visible: "Clear all filters"
+    commands:
+      - tapOn: "Clear all filters"
+      - waitForAnimationToEnd
+- tapOn: "Close filters"
+- waitForAnimationToEnd
+
+# Extra wait for check-in counts to load via Supabase Realtime
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# --- SCREENSHOT 1: Courts List (with active players) ---
+- takeScreenshot: app-store-assets/screenshots/01-courts-list
+
+# Tap first court to open detail
+- tapOn:
+    point: "50%, 30%"
+- extendedWaitUntil:
+    visible:
+      id: "directions-button"
+    timeout: 10000
+- waitForAnimationToEnd
+
+# --- SCREENSHOT 2: Court Detail (I'm Here + player count) ---
+- takeScreenshot: app-store-assets/screenshots/02-court-detail
+
+# Go back to courts list
+- tapOn:
+    point: "7%, 10%"
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 10000
+
+# Navigate to Map
+- tapOn:
+    id: "map-tab"
+- waitForAnimationToEnd
+# Wait for map controls to appear
+- extendedWaitUntil:
+    visible:
+      id: "refresh-button"
+    timeout: 20000
+# Tap recenter to trigger a fresh courts load for current location
+- tapOn:
+    id: "recenter-button"
+- waitForAnimationToEnd
+# Tap refresh to ensure courts for this view are loaded
+- tapOn:
+    id: "refresh-button"
+# Wait generously for court pins to load and render
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+
+# --- SCREENSHOT 4: Map View (with court pins) ---
+- takeScreenshot: app-store-assets/screenshots/04-map-view
+
+# Back to courts, open filters
+- tapOn:
+    id: "courts-tab"
+- waitForAnimationToEnd
+- tapOn:
+    id: "filter-button"
+- extendedWaitUntil:
+    visible: "COURT TYPE"
+    timeout: 10000
+
+# --- SCREENSHOT 5: Filters ---
+- takeScreenshot: app-store-assets/screenshots/05-filters
