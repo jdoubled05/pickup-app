@@ -132,24 +132,23 @@ export default function MapsTest() {
     const parsedLat = lat ? parseFloat(lat) : NaN;
     const parsedLon = lon ? parseFloat(lon) : NaN;
     const hasFocusCoords = Number.isFinite(parsedLat) && Number.isFinite(parsedLon);
-    const coords = hasFocusCoords
-      ? { lat: parsedLat, lon: parsedLon }
-      : (await getForegroundLocationOrDefault()).coords;
-    if (!hasFocusCoords) {
+    let coords: { lat: number; lon: number };
+    if (hasFocusCoords) {
+      coords = { lat: parsedLat, lon: parsedLon };
+    } else {
       const location = await getForegroundLocationOrDefault();
+      coords = location.coords;
       setCenter(location.coords);
       setLocationSource(location.source);
     }
+    skipRegionFetchRef.current += 1;
+    setRecenterSignal((v) => v + 1);
     try {
       await fetchCourts(coords);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
     } finally {
       setLoading(false);
-      if (hasFocusCoords) {
-        skipRegionFetchRef.current += 1;
-        setRecenterSignal((v) => v + 1);
-      }
     }
   }, [lat, lon]);
 
