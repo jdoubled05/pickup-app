@@ -8,13 +8,11 @@ import type { UserProfile } from "@/src/types/user";
 
 type AuthResult = { user: User; session: Session };
 
-/**
- * Sign in with Apple. Uses expo-apple-authentication to get an identity token,
- * then exchanges it with Supabase. On first sign-in, Apple provides the user's
- * name which we store in their profile.
- */
 export async function signInWithApple(): Promise<AuthResult | null> {
-  if (!supabase) return null;
+  if (!supabase) {
+    console.error("[auth] Supabase not configured");
+    return null;
+  }
 
   const credential = await AppleAuthentication.signInAsync({
     requestedScopes: [
@@ -23,16 +21,30 @@ export async function signInWithApple(): Promise<AuthResult | null> {
     ],
   });
 
-  if (!credential.identityToken) return null;
+  if (!credential.identityToken) {
+    console.error("[auth] Apple returned no identity token");
+    return null;
+  }
+
+  console.log("[auth] Got Apple identity token, exchanging with Supabase...");
 
   const { data, error } = await supabase.auth.signInWithIdToken({
     provider: "apple",
     token: credential.identityToken,
   });
 
-  if (error || !data.user || !data.session) return null;
+  if (error) {
+    console.error("[auth] Supabase Apple signInWithIdToken error:", error);
+    return null;
+  }
 
-  // Apple only provides name on the very first sign-in
+  if (!data.user || !data.session) {
+    console.error("[auth] Supabase returned no user/session:", data);
+    return null;
+  }
+
+  console.log("[auth] Apple sign-in success, user:", data.user.id);
+
   const givenName = credential.fullName?.givenName;
   const familyName = credential.fullName?.familyName;
   if (givenName) {
@@ -45,14 +57,14 @@ export async function signInWithApple(): Promise<AuthResult | null> {
   return { user: data.user, session: data.session };
 }
 
-/**
- * Sign in with Google. Opens a browser session via Supabase OAuth, waits for
- * the redirect back to the app, then exchanges the auth code for a session.
- */
 export async function signInWithGoogle(): Promise<AuthResult | null> {
-  if (!supabase) return null;
+  if (!supabase) {
+    console.error("[auth] Supabase not configured");
+    return null;
+  }
 
   const redirectTo = Linking.createURL("auth/callback");
+  console.log("[auth] Google redirect URL:", redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -62,21 +74,49 @@ export async function signInWithGoogle(): Promise<AuthResult | null> {
     },
   });
 
-  if (error || !data.url) return null;
+  if (error) {
+    console.error("[auth] Supabase signInWithOAuth error:", error);
+    return null;
+  }
 
+  if (!data.url) {
+    console.error("[auth] Supabase returned no OAuth URL");
+    return null;
+  }
+
+  console.log("[auth] Opening browser for Google OAuth...");
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+  console.log("[auth] Browser result:", JSON.stringify(result));
 
-  if (result.type !== "success") return null;
+  if (result.type !== "success") {
+    console.error("[auth] Browser did not return success:", result.type);
+    return null;
+  }
 
   const url = new URL(result.url);
-  const code = url.searchParams.get("code");
-  if (!code) return null;
+  console.log("[auth] Callback URL:", result.url);
 
+  const code = url.searchParams.get("code");
+  if (!code) {
+    console.error("[auth] No code in callback URL. Params:", result.url);
+    return null;
+  }
+
+  console.log("[auth] Exchanging code for session...");
   const { data: sessionData, error: sessionError } =
     await supabase.auth.exchangeCodeForSession(code);
 
-  if (sessionError || !sessionData.user || !sessionData.session) return null;
+  if (sessionError) {
+    console.error("[auth] exchangeCodeForSession error:", sessionError);
+    return null;
+  }
 
+  if (!sessionData.user || !sessionData.session) {
+    console.error("[auth] No user/session after exchange:", sessionData);
+    return null;
+  }
+
+  console.log("[auth] Google sign-in success, user:", sessionData.user.id);
   await migrateAnonymousData(sessionData.user.id);
 
   return { user: sessionData.user, session: sessionData.session };
@@ -87,9 +127,7 @@ export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
 }
 
-export async function getProfile(
-  userId: string
-): Promise<UserProfile | null> {
+export async function getProfile(userId: string): Promise<UserProfile | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from("profiles")
@@ -111,10 +149,6 @@ export async function updateProfile(
     .eq("id", userId);
 }
 
-/**
- * Transfers anonymous check-ins to the newly authenticated user so they
- * don't lose activity history when they sign up.
- */
 async function migrateAnonymousData(userId: string): Promise<void> {
   if (!supabase) return;
   try {
