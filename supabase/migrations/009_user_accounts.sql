@@ -50,7 +50,7 @@ CREATE TRIGGER on_auth_user_created
 CREATE TABLE IF NOT EXISTS saved_courts (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  court_id   UUID NOT NULL REFERENCES courts(id) ON DELETE CASCADE,
+  court_id   TEXT NOT NULL REFERENCES courts(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, court_id)
 );
