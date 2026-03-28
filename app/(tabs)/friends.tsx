@@ -7,7 +7,7 @@ import {
   Alert,
 } from "react-native";
 import { BasketballRefreshControl } from "@/src/components/BasketballRefreshControl";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
@@ -38,7 +38,6 @@ function timeAgo(iso: string): string {
 
 export default function FriendsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const { user } = useAuth();
@@ -122,9 +121,9 @@ export default function FriendsScreen() {
 
   if (!user) {
     return (
-      <View
+      <SafeAreaView
+        edges={["top"]}
         className="flex-1 bg-white dark:bg-black items-center justify-center px-6"
-        style={{ paddingTop: insets.top }}
       >
         <Ionicons
           name="people-outline"
@@ -143,15 +142,15 @@ export default function FriendsScreen() {
         >
           <Text className="text-white font-semibold">Sign In</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
+    <SafeAreaView edges={["top"]} className="flex-1 bg-white dark:bg-black">
     <ScrollView
-      className="flex-1 bg-white dark:bg-black"
+      className="flex-1"
       contentContainerStyle={{ paddingBottom: 32 }}
-      style={{ paddingTop: insets.top }}
       refreshControl={
         <BasketballRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
@@ -392,5 +391,6 @@ export default function FriendsScreen() {
         )}
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }

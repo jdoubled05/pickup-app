@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Image, Keyboard, Pressable, TextInput, View, ScrollView, useColorScheme } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Haptics from "expo-haptics";
@@ -47,7 +47,6 @@ export default function CourtsIndex() {
   const supabaseStatus = getSupabaseEnvStatus();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const insets = useSafeAreaInsets();
   const router = useRouter();
 
   // Sort courts by distance
@@ -275,9 +274,9 @@ export default function CourtsIndex() {
 
   return (
     <GestureHandlerRootView className="flex-1">
-      <View className="flex-1 bg-white dark:bg-black">
+      <SafeAreaView edges={["top"]} className="flex-1 bg-white dark:bg-black">
       {/* Header */}
-      <Pressable onPress={Keyboard.dismiss} className="px-6 pb-4" style={{ paddingTop: insets.top + 8 }}>
+      <Pressable onPress={Keyboard.dismiss} className="px-6 pt-2 pb-4">
         <View className="flex-row items-center justify-center">
           <Image
             source={isDark
@@ -674,7 +673,7 @@ export default function CourtsIndex() {
         onClose={() => setFilterModalVisible(false)}
         onApply={handleApplyFilters}
       />
-      </View>
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
