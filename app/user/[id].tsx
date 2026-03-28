@@ -16,12 +16,13 @@ import { Avatar } from "@/src/components/Avatar";
 import { useAuth } from "@/src/context/AuthContext";
 import {
   getUserPublicProfile,
+  getUserActiveCheckIn,
   sendFriendRequest,
   acceptFriendRequest,
   declineFriendRequest,
   removeFriend,
 } from "@/src/services/friends";
-import type { UserPublicProfile } from "@/src/services/friends";
+import type { UserPublicProfile, ActiveCheckIn } from "@/src/services/friends";
 import { PLAY_STYLE_LABELS, SKILL_LEVEL_LABELS } from "@/src/types/user";
 import type { PlayStyle, SkillLevel } from "@/src/types/user";
 
@@ -41,13 +42,18 @@ export default function UserProfileScreen() {
   const { user } = useAuth();
 
   const [profile, setProfile] = React.useState<UserPublicProfile | null>(null);
+  const [activeCheckIn, setActiveCheckIn] = React.useState<ActiveCheckIn | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [actionLoading, setActionLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (!id) return;
-    getUserPublicProfile(id).then((p) => {
+    Promise.all([
+      getUserPublicProfile(id),
+      getUserActiveCheckIn(id),
+    ]).then(([p, ci]) => {
       setProfile(p);
+      setActiveCheckIn(ci);
       setLoading(false);
     });
   }, [id]);
@@ -213,6 +219,34 @@ export default function UserProfileScreen() {
             </Pressable>
           )}
         </View>
+
+        {/* Active check-in */}
+        {activeCheckIn && (
+          <View className="mx-4 mb-4">
+            <Text className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/40 mb-3 px-2">
+              Playing Now
+            </Text>
+            <Pressable
+              onPress={() => router.push(`/court/${activeCheckIn.court_id}`)}
+              className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 px-4 py-3.5 flex-row items-center gap-3 active:opacity-70"
+            >
+              <View className="w-9 h-9 rounded-full bg-red-700/10 dark:bg-red-700/20 items-center justify-center">
+                <Ionicons name="basketball" size={18} color="#960000" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-semibold text-gray-900 dark:text-white">
+                  {activeCheckIn.court_name}
+                </Text>
+                {activeCheckIn.court_address && (
+                  <Text className="text-xs text-gray-500 dark:text-white/50 mt-0.5" numberOfLines={1}>
+                    {activeCheckIn.court_address}
+                  </Text>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={isDark ? "rgba(255,255,255,0.3)" : "#9ca3af"} />
+            </Pressable>
+          </View>
+        )}
 
         {/* Play Styles */}
         {profile.play_style && profile.play_style.length > 0 && (

@@ -25,6 +25,44 @@ async function getAuthUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
+export type ActiveCheckIn = {
+  court_id: string;
+  court_name: string;
+  court_address: string | null;
+  checked_in_at: string;
+};
+
+export async function getUserActiveCheckIn(
+  userId: string
+): Promise<ActiveCheckIn | null> {
+  const env = getSupabaseEnvStatus();
+  if (!env.configured || !supabase) return null;
+
+  const { data: checkIn } = await supabase
+    .from("check_ins")
+    .select("court_id, created_at, expires_at")
+    .eq("anonymous_user_id", userId)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle();
+
+  if (!checkIn) return null;
+
+  const { data: court } = await supabase
+    .from("courts")
+    .select("id, name, address")
+    .eq("id", checkIn.court_id)
+    .single();
+
+  if (!court) return null;
+
+  return {
+    court_id: court.id,
+    court_name: court.name,
+    court_address: court.address,
+    checked_in_at: checkIn.created_at,
+  };
+}
+
 export async function getUserPublicProfile(
   targetId: string
 ): Promise<UserPublicProfile | null> {
