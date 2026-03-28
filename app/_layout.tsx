@@ -122,6 +122,7 @@ export default function RootLayout() {
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="setup-profile" options={{ headerShown: false, presentation: "fullScreenModal", gestureEnabled: false }} />
         <Stack.Screen name="friend-search" options={{ headerShown: false, presentation: "modal" }} />
+        <Stack.Screen name="user/[id]" options={{ headerShown: false }} />
       </Stack>
     </AppShell>
     </AuthProvider>

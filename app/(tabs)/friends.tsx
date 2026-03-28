@@ -189,19 +189,21 @@ export default function FriendsScreen() {
                     : ""
                 }`}
               >
-                <Avatar
-                  uri={req.friend.avatar_url}
-                  initials={req.friend.username.slice(0, 2).toUpperCase()}
-                  size={42}
-                />
-                <View className="flex-1">
+                <Pressable onPress={() => router.push(`/user/${req.friend.id}`)}>
+                  <Avatar
+                    uri={req.friend.avatar_url}
+                    initials={req.friend.username.slice(0, 2).toUpperCase()}
+                    size={42}
+                  />
+                </Pressable>
+                <Pressable className="flex-1" onPress={() => router.push(`/user/${req.friend.id}`)}>
                   <Text className="font-semibold text-gray-900 dark:text-white">
                     {req.friend.username}
                   </Text>
                   <Text className="text-xs text-gray-500 dark:text-white/50">
                     Sent you a friend request
                   </Text>
-                </View>
+                </Pressable>
                 <Pressable
                   onPress={() => handleDecline(req.id)}
                   className="rounded-full border border-gray-300 dark:border-white/20 px-3 py-1.5 mr-2"
@@ -231,19 +233,21 @@ export default function FriendsScreen() {
                     : ""
                 }`}
               >
-                <Avatar
-                  uri={req.friend.avatar_url}
-                  initials={req.friend.username.slice(0, 2).toUpperCase()}
-                  size={42}
-                />
-                <View className="flex-1">
+                <Pressable onPress={() => router.push(`/user/${req.friend.id}`)}>
+                  <Avatar
+                    uri={req.friend.avatar_url}
+                    initials={req.friend.username.slice(0, 2).toUpperCase()}
+                    size={42}
+                  />
+                </Pressable>
+                <Pressable className="flex-1" onPress={() => router.push(`/user/${req.friend.id}`)}>
                   <Text className="font-semibold text-gray-900 dark:text-white">
                     {req.friend.username}
                   </Text>
                   <Text className="text-xs text-gray-500 dark:text-white/50">
                     Request pending
                   </Text>
-                </View>
+                </Pressable>
                 <Pressable
                   onPress={() => handleCancelRequest(req.id)}
                   className="rounded-full border border-gray-300 dark:border-white/20 px-3 py-1.5"
@@ -290,11 +294,13 @@ export default function FriendsScreen() {
                     : ""
                 }`}
               >
-                <Avatar
-                  uri={item.friend_avatar_url}
-                  initials={item.friend_username.slice(0, 2).toUpperCase()}
-                  size={44}
-                />
+                <Pressable onPress={(e) => { e.stopPropagation(); router.push(`/user/${item.friend_id}`); }}>
+                  <Avatar
+                    uri={item.friend_avatar_url}
+                    initials={item.friend_username.slice(0, 2).toUpperCase()}
+                    size={44}
+                  />
+                </Pressable>
                 <View className="flex-1">
                   <Text className="font-semibold text-gray-900 dark:text-white">
                     {item.friend_username}
@@ -346,9 +352,10 @@ export default function FriendsScreen() {
         ) : (
           <View className="rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
             {friends.map((item, i) => (
-              <View
+              <Pressable
                 key={item.id}
-                className={`flex-row items-center px-4 py-3.5 gap-3 bg-white dark:bg-black ${
+                onPress={() => router.push(`/user/${item.friend.id}`)}
+                className={`flex-row items-center px-4 py-3.5 gap-3 bg-white dark:bg-black active:opacity-70 ${
                   i < friends.length - 1
                     ? "border-b border-gray-100 dark:border-white/10"
                     : ""
@@ -370,7 +377,7 @@ export default function FriendsScreen() {
                   )}
                 </View>
                 <Pressable
-                  onPress={() => handleRemoveFriend(item)}
+                  onPress={(e) => { e.stopPropagation(); handleRemoveFriend(item); }}
                   hitSlop={8}
                 >
                   <Ionicons
@@ -379,7 +386,7 @@ export default function FriendsScreen() {
                     color={iconColor}
                   />
                 </Pressable>
-              </View>
+              </Pressable>
             ))}
           </View>
         )}

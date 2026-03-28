@@ -213,8 +213,9 @@ export default function FriendSearchScreen() {
             )
           }
           renderItem={({ item, index }) => (
-            <View
-              className={`flex-row items-center py-3 gap-3 ${
+            <Pressable
+              onPress={() => router.push(`/user/${item.id}`)}
+              className={`flex-row items-center py-3 gap-3 active:opacity-70 ${
                 index < results.length - 1
                   ? "border-b border-gray-100 dark:border-white/10"
                   : ""
@@ -235,8 +236,10 @@ export default function FriendSearchScreen() {
                   </Text>
                 )}
               </View>
-              {renderStatus(item)}
-            </View>
+              <Pressable onPress={(e) => { e.stopPropagation(); }} hitSlop={4}>
+                {renderStatus(item)}
+              </Pressable>
+            </Pressable>
           )}
         />
       )}

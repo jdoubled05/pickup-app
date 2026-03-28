@@ -7,10 +7,71 @@ import type {
   FriendshipStatus,
 } from "@/src/types/friends";
 
+export type UserPublicProfile = {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  skill_level: string | null;
+  play_style: string[] | null;
+  created_at: string;
+  friendship_id: string | null;
+  friendship_status: FriendshipStatus | null;
+  is_requester: boolean | null;
+};
+
 async function getAuthUserId(): Promise<string | null> {
   if (!supabase) return null;
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user?.id ?? null;
+}
+
+export async function getUserPublicProfile(
+  targetId: string
+): Promise<UserPublicProfile | null> {
+  const env = getSupabaseEnvStatus();
+  if (!env.configured || !supabase) return null;
+
+  const userId = await getAuthUserId();
+
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id, username, avatar_url, skill_level, play_style, created_at")
+    .eq("id", targetId)
+    .single();
+
+  if (error || !profile?.username) return null;
+
+  let friendship_id: string | null = null;
+  let friendship_status: FriendshipStatus | null = null;
+  let is_requester: boolean | null = null;
+
+  if (userId && userId !== targetId) {
+    const { data: f } = await supabase
+      .from("friendships")
+      .select("id, requester_id, status")
+      .or(
+        `and(requester_id.eq.${userId},addressee_id.eq.${targetId}),and(requester_id.eq.${targetId},addressee_id.eq.${userId})`
+      )
+      .maybeSingle();
+
+    if (f) {
+      friendship_id = f.id;
+      friendship_status = f.status as FriendshipStatus;
+      is_requester = f.requester_id === userId;
+    }
+  }
+
+  return {
+    id: profile.id,
+    username: profile.username,
+    avatar_url: profile.avatar_url,
+    skill_level: profile.skill_level,
+    play_style: profile.play_style,
+    created_at: profile.created_at,
+    friendship_id,
+    friendship_status,
+    is_requester,
+  };
 }
 
 export async function searchUsers(query: string): Promise<UserSearchResult[]> {
