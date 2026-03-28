@@ -58,6 +58,18 @@ export default function SetupProfileScreen() {
   const [skillLevel, setSkillLevel] = useState<SkillLevel | null>(profile?.skill_level ?? null);
   const [avatarUri, setAvatarUri] = useState<string | null>(profile?.avatar_url ?? null);
   const [avatarChanged, setAvatarChanged] = useState(false);
+  const [profileSynced, setProfileSynced] = useState(!!profile);
+
+  // Sync state from profile once it loads (in case it wasn't ready on first render)
+  React.useEffect(() => {
+    if (profile && !profileSynced) {
+      setUsername(profile.username ?? "");
+      setPlayStyles(profile.play_style ?? []);
+      setSkillLevel(profile.skill_level ?? null);
+      setAvatarUri(profile.avatar_url ?? null);
+      setProfileSynced(true);
+    }
+  }, [profile, profileSynced]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
@@ -72,14 +84,20 @@ export default function SetupProfileScreen() {
       : null;
   const usernameLocked = nextChangeDate !== null && nextChangeDate > new Date();
 
-  // Which username policy notice to show in the confirmation modal
-  const usernameNotice: string | null = usernameLocked
-    ? null
-    : changeCount === 0
-    ? "You can change your username one more time for free after this. After that, you'll need to wait a year."
-    : changeCount === 1
-    ? "This is your last free username change. After confirming, you won't be able to change it for 1 year."
-    : null;
+  // Only show the username policy notice when the username is actually being changed
+  const willChangeUsername =
+    !usernameLocked &&
+    username.trim() !== (profile?.username ?? "") &&
+    username.trim().length >= 2;
+
+  const usernameNotice: string | null =
+    !willChangeUsername
+      ? null
+      : changeCount === 0
+      ? "You can change your username one more time for free after this. After that, you'll need to wait a year."
+      : changeCount === 1
+      ? "This is your last free username change. After confirming, you won't be able to change it for 1 year."
+      : null;
 
   const handleAvatarPress = () => {
     const options = ["Take Photo", "Choose from Library"];
