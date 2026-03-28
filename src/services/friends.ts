@@ -387,16 +387,28 @@ export async function getFriendActivity(): Promise<FriendActivity[]> {
     f.requester_id === userId ? f.addressee_id : f.requester_id
   );
 
+  // Match on user_id (new typed column) OR anonymous_user_id (UUID stored as text,
+  // for check-ins made before migration 011 or with older app versions).
+  const orFilter = friendIds
+    .map((id) => `user_id.eq.${id},anonymous_user_id.eq.${id}`)
+    .join(",");
+
   const { data: checkIns } = await supabase
     .from("check_ins")
-    .select("user_id, court_id, created_at, expires_at")
-    .in("user_id", friendIds)
+    .select("user_id, anonymous_user_id, court_id, created_at, expires_at")
+    .or(orFilter)
     .gt("expires_at", new Date().toISOString());
 
   if (!checkIns || checkIns.length === 0) return [];
 
-  const checkedInIds = [...new Set(checkIns.map((c) => c.user_id as string))];
-  const courtIds = [...new Set(checkIns.map((c) => c.court_id))];
+  // Resolve the friend's UUID from whichever column matched
+  const resolvedCheckIns = checkIns.map((ci) => ({
+    ...ci,
+    friend_id: (ci.user_id ?? ci.anonymous_user_id) as string,
+  }));
+
+  const checkedInIds = [...new Set(resolvedCheckIns.map((c) => c.friend_id))];
+  const courtIds = [...new Set(resolvedCheckIns.map((c) => c.court_id))];
 
   const [{ data: profiles }, { data: courts }] = await Promise.all([
     supabase
@@ -418,9 +430,9 @@ export async function getFriendActivity(): Promise<FriendActivity[]> {
     ])
   );
 
-  return checkIns
+  return resolvedCheckIns
     .map((ci) => {
-      const friendId = ci.user_id as string;
+      const friendId = ci.friend_id;
       const profile = profileMap.get(friendId);
       const court = courtMap.get(ci.court_id);
       if (!profile?.username || !court) return null;
