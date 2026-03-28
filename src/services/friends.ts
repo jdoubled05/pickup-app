@@ -131,6 +131,51 @@ export async function removeFriend(friendshipId: string): Promise<boolean> {
   return !error;
 }
 
+export async function getSentRequests(): Promise<FriendWithProfile[]> {
+  const env = getSupabaseEnvStatus();
+  if (!env.configured || !supabase) return [];
+
+  const userId = await getAuthUserId();
+  if (!userId) return [];
+
+  const { data: friendships, error } = await supabase
+    .from("friendships")
+    .select("id, requester_id, addressee_id, status, created_at, updated_at")
+    .eq("requester_id", userId)
+    .eq("status", "pending");
+
+  if (error || !friendships || friendships.length === 0) return [];
+
+  const addresseeIds = friendships.map((f) => f.addressee_id);
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, username, avatar_url, skill_level, play_style")
+    .in("id", addresseeIds);
+
+  const profileMap = new Map(
+    (profiles ?? []).map((p) => [p.id, p])
+  );
+
+  return friendships
+    .map((f) => {
+      const profile = profileMap.get(f.addressee_id);
+      if (!profile) return null;
+      return {
+        ...f,
+        status: f.status as FriendshipStatus,
+        friend: {
+          id: profile.id,
+          username: profile.username ?? "",
+          avatar_url: profile.avatar_url,
+          skill_level: profile.skill_level,
+          play_style: profile.play_style,
+        },
+      };
+    })
+    .filter((f): f is FriendWithProfile => f !== null);
+}
+
 export async function getFriends(): Promise<FriendWithProfile[]> {
   const env = getSupabaseEnvStatus();
   if (!env.configured || !supabase) return [];

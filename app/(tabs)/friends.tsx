@@ -17,6 +17,7 @@ import { useAuth } from "@/src/context/AuthContext";
 import {
   getFriends,
   getPendingRequests,
+  getSentRequests,
   getFriendActivity,
   acceptFriendRequest,
   declineFriendRequest,
@@ -44,26 +45,31 @@ export default function FriendsScreen() {
 
   const [activity, setActivity] = React.useState<FriendActivity[]>([]);
   const [friends, setFriends] = React.useState<FriendWithProfile[]>([]);
-  const [requests, setRequests] = React.useState<FriendWithProfile[]>([]);
+  const [incoming, setIncoming] = React.useState<FriendWithProfile[]>([]);
+  const [sent, setSent] = React.useState<FriendWithProfile[]>([]);
   const [refreshing, setRefreshing] = React.useState(false);
-  const [requestsExpanded, setRequestsExpanded] = React.useState(true);
 
   const loadAll = React.useCallback(async () => {
-    const [a, f, r] = await Promise.all([
+    const [a, f, inc, snt] = await Promise.all([
       getFriendActivity(),
       getFriends(),
       getPendingRequests(),
+      getSentRequests(),
     ]);
     setActivity(a);
     setFriends(f);
-    setRequests(r);
+    setIncoming(inc);
+    setSent(snt);
   }, []);
 
   React.useEffect(() => {
     if (!user) return;
     loadAll();
     const unsubActivity = subscribeToFriendActivity(setActivity);
-    const unsubRequests = subscribeToFriendRequests(setRequests);
+    const unsubRequests = subscribeToFriendRequests((inc) => {
+      setIncoming(inc);
+      getSentRequests().then(setSent);
+    });
     return () => {
       unsubActivity();
       unsubRequests();
@@ -85,7 +91,13 @@ export default function FriendsScreen() {
   const handleDecline = async (friendshipId: string) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const ok = await declineFriendRequest(friendshipId);
-    if (ok) setRequests((prev) => prev.filter((r) => r.id !== friendshipId));
+    if (ok) setIncoming((prev) => prev.filter((r) => r.id !== friendshipId));
+  };
+
+  const handleCancelRequest = async (friendshipId: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const ok = await removeFriend(friendshipId);
+    if (ok) setSent((prev) => prev.filter((r) => r.id !== friendshipId));
   };
 
   const handleRemoveFriend = (item: FriendWithProfile) => {
@@ -161,54 +173,34 @@ export default function FriendsScreen() {
         </Pressable>
       </View>
 
-      {/* Friend Requests */}
-      {requests.length > 0 && (
-        <View className="mx-4 mt-4 rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 overflow-hidden">
-          <Pressable
-            onPress={() => setRequestsExpanded((v) => !v)}
-            className="flex-row items-center justify-between px-4 py-3"
-          >
-            <View className="flex-row items-center gap-2">
-              <View className="bg-red-700 rounded-full w-5 h-5 items-center justify-center">
-                <Text className="text-white text-xs font-bold">
-                  {requests.length}
-                </Text>
-              </View>
-              <Text className="font-semibold text-gray-900 dark:text-white">
-                Friend{requests.length !== 1 ? " Requests" : " Request"}
-              </Text>
-            </View>
-            <Ionicons
-              name={requestsExpanded ? "chevron-up" : "chevron-down"}
-              size={16}
-              color={isDark ? "rgba(255,255,255,0.4)" : "#9ca3af"}
-            />
-          </Pressable>
-
-          {requestsExpanded &&
-            requests.map((req, i) => (
+      {/* Requests */}
+      {(incoming.length > 0 || sent.length > 0) && (
+        <View className="px-4 mt-4">
+          <Text className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/40 mb-3 px-2">
+            Requests
+          </Text>
+          <View className="rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+            {incoming.map((req, i) => (
               <View
                 key={req.id}
-                className={`flex-row items-center px-4 py-3 gap-3 ${
-                  i < requests.length - 1
-                    ? "border-t border-gray-200 dark:border-white/10"
+                className={`flex-row items-center px-4 py-3.5 gap-3 bg-white dark:bg-black ${
+                  i < incoming.length + sent.length - 1
+                    ? "border-b border-gray-100 dark:border-white/10"
                     : ""
                 }`}
               >
                 <Avatar
                   uri={req.friend.avatar_url}
                   initials={req.friend.username.slice(0, 2).toUpperCase()}
-                  size={40}
+                  size={42}
                 />
                 <View className="flex-1">
                   <Text className="font-semibold text-gray-900 dark:text-white">
                     {req.friend.username}
                   </Text>
-                  {req.friend.skill_level && (
-                    <Text className="text-xs text-gray-500 dark:text-white/50 capitalize">
-                      {req.friend.skill_level}
-                    </Text>
-                  )}
+                  <Text className="text-xs text-gray-500 dark:text-white/50">
+                    Sent you a friend request
+                  </Text>
                 </View>
                 <Pressable
                   onPress={() => handleDecline(req.id)}
@@ -230,6 +222,40 @@ export default function FriendsScreen() {
                 </Pressable>
               </View>
             ))}
+            {sent.map((req, i) => (
+              <View
+                key={req.id}
+                className={`flex-row items-center px-4 py-3.5 gap-3 bg-white dark:bg-black ${
+                  i < sent.length - 1
+                    ? "border-b border-gray-100 dark:border-white/10"
+                    : ""
+                }`}
+              >
+                <Avatar
+                  uri={req.friend.avatar_url}
+                  initials={req.friend.username.slice(0, 2).toUpperCase()}
+                  size={42}
+                />
+                <View className="flex-1">
+                  <Text className="font-semibold text-gray-900 dark:text-white">
+                    {req.friend.username}
+                  </Text>
+                  <Text className="text-xs text-gray-500 dark:text-white/50">
+                    Request pending
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => handleCancelRequest(req.id)}
+                  className="rounded-full border border-gray-300 dark:border-white/20 px-3 py-1.5"
+                  hitSlop={4}
+                >
+                  <Text className="text-sm text-gray-600 dark:text-white/70">
+                    Cancel
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
         </View>
       )}
 
