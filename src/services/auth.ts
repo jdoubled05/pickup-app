@@ -9,10 +9,7 @@ import type { UserProfile } from "@/src/types/user";
 type AuthResult = { user: User; session: Session };
 
 export async function signInWithApple(): Promise<AuthResult | null> {
-  if (!supabase) {
-    console.error("[auth] Supabase not configured");
-    return null;
-  }
+  if (!supabase) return null;
 
   const credential = await AppleAuthentication.signInAsync({
     requestedScopes: [
@@ -21,29 +18,14 @@ export async function signInWithApple(): Promise<AuthResult | null> {
     ],
   });
 
-  if (!credential.identityToken) {
-    console.error("[auth] Apple returned no identity token");
-    return null;
-  }
-
-  console.log("[auth] Got Apple identity token, exchanging with Supabase...");
+  if (!credential.identityToken) return null;
 
   const { data, error } = await supabase.auth.signInWithIdToken({
     provider: "apple",
     token: credential.identityToken,
   });
 
-  if (error) {
-    console.error("[auth] Supabase Apple signInWithIdToken error:", error);
-    return null;
-  }
-
-  if (!data.user || !data.session) {
-    console.error("[auth] Supabase returned no user/session:", data);
-    return null;
-  }
-
-  console.log("[auth] Apple sign-in success, user:", data.user.id);
+  if (error || !data.user || !data.session) return null;
 
   const givenName = credential.fullName?.givenName;
   const familyName = credential.fullName?.familyName;
@@ -58,13 +40,9 @@ export async function signInWithApple(): Promise<AuthResult | null> {
 }
 
 export async function signInWithGoogle(): Promise<AuthResult | null> {
-  if (!supabase) {
-    console.error("[auth] Supabase not configured");
-    return null;
-  }
+  if (!supabase) return null;
 
   const redirectTo = Linking.createURL("auth/callback");
-  console.log("[auth] Google redirect URL:", redirectTo);
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -74,32 +52,17 @@ export async function signInWithGoogle(): Promise<AuthResult | null> {
     },
   });
 
-  if (error) {
-    console.error("[auth] Supabase signInWithOAuth error:", error);
-    return null;
-  }
+  if (error || !data.url) return null;
 
-  if (!data.url) {
-    console.error("[auth] Supabase returned no OAuth URL");
-    return null;
-  }
-
-  console.log("[auth] Opening browser for Google OAuth...");
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  console.log("[auth] Browser result:", JSON.stringify(result));
 
-  if (result.type !== "success") {
-    console.error("[auth] Browser did not return success:", result.type);
-    return null;
-  }
+  if (result.type !== "success") return null;
 
   const url = new URL(result.url);
-  console.log("[auth] Callback URL:", result.url);
 
   const errorParam = url.searchParams.get("error");
   if (errorParam) {
     const desc = url.searchParams.get("error_description") ?? errorParam;
-    console.error("[auth] OAuth callback error:", desc);
     throw new Error(desc.replace(/\+/g, " "));
   }
 
@@ -112,43 +75,23 @@ export async function signInWithGoogle(): Promise<AuthResult | null> {
   const accessToken = hashParams.get("access_token");
   const refreshToken = hashParams.get("refresh_token");
 
-  if (!code && !accessToken) {
-    console.error("[auth] No code or token in callback URL:", result.url);
-    return null;
-  }
+  if (!code && !accessToken) return null;
 
   let sessionData: { user: import("@supabase/supabase-js").User; session: import("@supabase/supabase-js").Session } | null = null;
 
   if (code) {
-    console.log("[auth] Exchanging code for session (PKCE)...");
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      console.error("[auth] exchangeCodeForSession error:", error);
-      return null;
-    }
-    if (!data.user || !data.session) {
-      console.error("[auth] No user/session after exchange:", data);
-      return null;
-    }
+    if (error || !data.user || !data.session) return null;
     sessionData = { user: data.user, session: data.session };
   } else {
-    console.log("[auth] Setting session from hash tokens (implicit flow)...");
     const { data, error } = await supabase.auth.setSession({
       access_token: accessToken!,
       refresh_token: refreshToken ?? "",
     });
-    if (error) {
-      console.error("[auth] setSession error:", error);
-      return null;
-    }
-    if (!data.user || !data.session) {
-      console.error("[auth] No user/session after setSession:", data);
-      return null;
-    }
+    if (error || !data.user || !data.session) return null;
     sessionData = { user: data.user, session: data.session };
   }
 
-  console.log("[auth] Google sign-in success, user:", sessionData.user.id);
   await migrateAnonymousData(sessionData.user.id);
 
   return { user: sessionData.user, session: sessionData.session };
