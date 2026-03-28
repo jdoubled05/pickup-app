@@ -3,10 +3,10 @@ import {
   View,
   ScrollView,
   Pressable,
-  RefreshControl,
   useColorScheme,
   Alert,
 } from "react-native";
+import { BasketballRefreshControl } from "@/src/components/BasketballRefreshControl";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -153,7 +153,7 @@ export default function FriendsScreen() {
       contentContainerStyle={{ paddingBottom: 32 }}
       style={{ paddingTop: insets.top }}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        <BasketballRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }
     >
       {/* Header */}
