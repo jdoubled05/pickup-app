@@ -41,7 +41,7 @@ export async function getUserActiveCheckIn(
   const { data: checkIn } = await supabase
     .from("check_ins")
     .select("court_id, created_at, expires_at")
-    .eq("anonymous_user_id", userId)
+    .eq("user_id", userId)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
 
@@ -387,16 +387,15 @@ export async function getFriendActivity(): Promise<FriendActivity[]> {
     f.requester_id === userId ? f.addressee_id : f.requester_id
   );
 
-  // Friends use their UUID as anonymous_user_id (set via migrateAnonymousData on sign-in)
   const { data: checkIns } = await supabase
     .from("check_ins")
-    .select("anonymous_user_id, court_id, created_at, expires_at")
-    .in("anonymous_user_id", friendIds)
+    .select("user_id, court_id, created_at, expires_at")
+    .in("user_id", friendIds)
     .gt("expires_at", new Date().toISOString());
 
   if (!checkIns || checkIns.length === 0) return [];
 
-  const checkedInIds = [...new Set(checkIns.map((c) => c.anonymous_user_id))];
+  const checkedInIds = [...new Set(checkIns.map((c) => c.user_id as string))];
   const courtIds = [...new Set(checkIns.map((c) => c.court_id))];
 
   const [{ data: profiles }, { data: courts }] = await Promise.all([
@@ -421,12 +420,13 @@ export async function getFriendActivity(): Promise<FriendActivity[]> {
 
   return checkIns
     .map((ci) => {
-      const profile = profileMap.get(ci.anonymous_user_id);
+      const friendId = ci.user_id as string;
+      const profile = profileMap.get(friendId);
       const court = courtMap.get(ci.court_id);
       if (!profile?.username || !court) return null;
       return {
-        friendship_id: friendshipIdMap.get(ci.anonymous_user_id) ?? "",
-        friend_id: ci.anonymous_user_id,
+        friendship_id: friendshipIdMap.get(friendId) ?? "",
+        friend_id: friendId,
         friend_username: profile.username,
         friend_avatar_url: profile.avatar_url,
         court_id: ci.court_id,

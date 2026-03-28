@@ -93,6 +93,13 @@ export async function checkIn(courtId: string): Promise<CheckIn | null> {
   try {
     const userId = await getCurrentUserId();
 
+    // Resolve auth UUID separately so we can store it in the typed user_id column
+    let authUserId: string | null = null;
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      authUserId = session?.user?.id ?? null;
+    }
+
     // Remove any existing check-ins for this user (enforces one check-in at a time)
     await checkOut();
 
@@ -100,6 +107,7 @@ export async function checkIn(courtId: string): Promise<CheckIn | null> {
     const checkInData: CheckInInsert = {
       court_id: courtId,
       anonymous_user_id: userId,
+      user_id: authUserId,
     };
 
     const { data, error } = await supabase
