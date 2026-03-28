@@ -6,23 +6,36 @@
 --    Auto-created for every new auth user via trigger below.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS profiles (
-  id         UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  username   TEXT,
-  avatar_url TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username    TEXT,
+  avatar_url  TEXT,
+  play_style          TEXT[],
+  skill_level         TEXT CHECK (skill_level IN ('casual','intermediate','competitive')),
+  username_updated_at  TIMESTAMPTZ,
+  username_change_count INTEGER NOT NULL DEFAULT 0,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Add columns if migrating an existing table
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS play_style          TEXT[];
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS skill_level         TEXT CHECK (skill_level IN ('casual','intermediate','competitive'));
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username_updated_at  TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username_change_count INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
 CREATE POLICY "Users can read own profile"
   ON profiles FOR SELECT
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
 CREATE POLICY "Users can update own profile"
   ON profiles FOR UPDATE
   USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
@@ -57,6 +70,7 @@ CREATE TABLE IF NOT EXISTS saved_courts (
 
 ALTER TABLE saved_courts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can manage own saved courts" ON saved_courts;
 CREATE POLICY "Users can manage own saved courts"
   ON saved_courts FOR ALL
   USING (auth.uid() = user_id);

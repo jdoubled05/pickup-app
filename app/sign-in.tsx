@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as AppleAuthentication from "expo-apple-authentication";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text } from "@/src/components/ui/Text";
-import { signInWithApple, signInWithGoogle } from "@/src/services/auth";
+import { signInWithApple, signInWithGoogle, getProfile } from "@/src/services/auth";
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -21,13 +21,22 @@ export default function SignInScreen() {
   const [loading, setLoading] = useState<"apple" | "google" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const navigateAfterSignIn = async (userId: string) => {
+    const profile = await getProfile(userId);
+    if (!profile?.username) {
+      router.replace("/setup-profile" as never);
+    } else {
+      router.back();
+    }
+  };
+
   const handleApple = async () => {
     setError(null);
     setLoading("apple");
     try {
       const result = await signInWithApple();
       if (result) {
-        router.back();
+        await navigateAfterSignIn(result.user.id);
       }
     } catch (err: unknown) {
       // ERR_CANCELED means user dismissed — not an error worth showing
@@ -49,7 +58,7 @@ export default function SignInScreen() {
     try {
       const result = await signInWithGoogle();
       if (result) {
-        router.back();
+        await navigateAfterSignIn(result.user.id);
       } else {
         setError("Google sign-in was cancelled.");
       }
@@ -91,12 +100,9 @@ export default function SignInScreen() {
         {/* Apple Sign In — iOS only */}
         {Platform.OS === "ios" && (
           <Pressable
-            onPress={handleApple}
             disabled={!!loading}
-            className="flex-row items-center justify-center rounded-2xl bg-black dark:bg-white px-5 py-4 gap-3"
-            style={{ opacity: loading === "apple" ? 0.6 : 1 }}
-            accessibilityLabel="Sign in with Apple"
-            accessibilityRole="button"
+            className="flex-row items-center justify-center rounded-2xl bg-black dark:bg-white px-5 gap-3"
+            style={{ opacity: loading === "apple" ? 0.6 : 1, height: 50 }}
           >
             {loading === "apple" ? (
               <ActivityIndicator size="small" color={isDark ? "#000" : "#fff"} />
@@ -120,8 +126,8 @@ export default function SignInScreen() {
         <Pressable
           onPress={handleGoogle}
           disabled={!!loading}
-          className="flex-row items-center justify-center rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 py-4 gap-3"
-          style={{ opacity: loading === "google" ? 0.6 : 1 }}
+          className="flex-row items-center justify-center rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-5 gap-3"
+          style={{ opacity: loading === "google" ? 0.6 : 1, height: 50 }}
           accessibilityLabel="Sign in with Google"
           accessibilityRole="button"
         >

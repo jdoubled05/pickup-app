@@ -119,6 +119,8 @@ export default function RootLayout() {
           }}
         />
         <Stack.Screen name="sign-in" options={{ headerShown: false, presentation: "modal" }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
+        <Stack.Screen name="setup-profile" options={{ headerShown: false, presentation: "fullScreenModal", gestureEnabled: false }} />
       </Stack>
     </AppShell>
     </AuthProvider>

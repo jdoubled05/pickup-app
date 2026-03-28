@@ -287,3 +287,20 @@ export async function toggleCheckIn(courtId: string): Promise<boolean> {
     return !!result;
   }
 }
+
+/**
+ * Returns the total number of check-ins ever made by the given user ID.
+ */
+export async function getUserCheckInCount(userId: string): Promise<number> {
+  if (!supabase) return 0;
+  try {
+    const { count, error } = await supabase
+      .from("check_ins")
+      .select("id", { count: "exact", head: true })
+      .eq("anonymous_user_id", userId);
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
