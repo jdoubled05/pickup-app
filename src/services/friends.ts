@@ -40,7 +40,7 @@ export async function getUserActiveCheckIn(
 
   const { data: checkIn } = await supabase
     .from("check_ins")
-    .select("court_id, created_at, expires_at")
+    .select("court_id, expires_at")
     .eq("user_id", userId)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
@@ -59,7 +59,7 @@ export async function getUserActiveCheckIn(
     court_id: court.id,
     court_name: court.name,
     court_address: court.address,
-    checked_in_at: checkIn.created_at,
+    checked_in_at: new Date(new Date(checkIn.expires_at).getTime() - 3 * 60 * 60 * 1000).toISOString(),
   };
 }
 
@@ -395,7 +395,7 @@ export async function getFriendActivity(): Promise<FriendActivity[]> {
 
   const { data: checkIns } = await supabase
     .from("check_ins")
-    .select("user_id, anonymous_user_id, court_id, created_at, expires_at")
+    .select("user_id, anonymous_user_id, court_id, expires_at")
     .or(orFilter)
     .gt("expires_at", new Date().toISOString());
 
@@ -444,7 +444,7 @@ export async function getFriendActivity(): Promise<FriendActivity[]> {
         court_id: ci.court_id,
         court_name: court.name,
         court_address: court.address,
-        checked_in_at: ci.created_at,
+        checked_in_at: new Date(new Date(ci.expires_at).getTime() - 3 * 60 * 60 * 1000).toISOString(),
         expires_at: ci.expires_at,
       } as FriendActivity;
     })
