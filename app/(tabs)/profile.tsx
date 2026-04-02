@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Pressable, ScrollView, ActivityIndicator, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Link, useRouter } from "expo-router";
+import { Link, useRouter, useFocusEffect } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
@@ -42,7 +42,7 @@ export default function ProfileScreen() {
     return subscribeSavedCourts((ids) => setSavedCount(ids.length));
   }, []);
 
-  React.useEffect(() => {
+  const refreshActivity = React.useCallback(() => {
     if (user?.id) {
       getUserCheckInCount(user.id).then(setCheckInCount);
       getUserCheckInHistory(user.id).then(setCheckInHistory);
@@ -51,6 +51,12 @@ export default function ProfileScreen() {
       setCheckInHistory([]);
     }
   }, [user?.id]);
+
+  React.useEffect(() => {
+    refreshActivity();
+  }, [refreshActivity]);
+
+  useFocusEffect(refreshActivity);
 
   const displayName = profile?.username ?? user?.email?.split("@")[0] ?? "Player";
   const initials = displayName
