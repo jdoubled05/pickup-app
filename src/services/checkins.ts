@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { supabase, getSupabaseEnvStatus } from "./supabase";
-import type { CheckIn, CheckInInsert, ActiveCheckInsResponse } from "@/src/types/checkins";
+import type { CheckIn, CheckInInsert, ActiveCheckInsResponse, CheckInHistoryItem } from "@/src/types/checkins";
 
 const ANONYMOUS_USER_ID_KEY = "anonymous_user_id";
 const CURRENT_CHECK_IN_KEY = "current_check_in_court_id";
@@ -310,5 +310,53 @@ export async function getUserCheckInCount(userId: string): Promise<number> {
     return count ?? 0;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * Returns the user's recent check-in history with court details.
+ * Includes both active and expired check-ins, most recent first.
+ */
+export async function getUserCheckInHistory(
+  userId: string,
+  limit = 10
+): Promise<CheckInHistoryItem[]> {
+  if (!supabase) return [];
+  try {
+    const { data: checkIns, error } = await supabase
+      .from("check_ins")
+      .select("court_id, expires_at")
+      .eq("anonymous_user_id", userId)
+      .order("expires_at", { ascending: false })
+      .limit(limit);
+
+    if (error || !checkIns || checkIns.length === 0) return [];
+
+    const courtIds = [...new Set(checkIns.map((c) => c.court_id))];
+    const { data: courts } = await supabase
+      .from("courts")
+      .select("id, name, address")
+      .in("id", courtIds);
+
+    const courtMap = new Map((courts ?? []).map((c) => [c.id, c]));
+    const now = new Date().toISOString();
+
+    return checkIns
+      .map((ci) => {
+        const court = courtMap.get(ci.court_id);
+        if (!court) return null;
+        return {
+          court_id: ci.court_id,
+          court_name: court.name,
+          court_address: court.address,
+          checked_in_at: new Date(
+            new Date(ci.expires_at).getTime() - 3 * 60 * 60 * 1000
+          ).toISOString(),
+          is_active: ci.expires_at > now,
+        };
+      })
+      .filter((item): item is CheckInHistoryItem => item !== null);
+  } catch {
+    return [];
   }
 }

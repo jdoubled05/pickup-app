@@ -18,3 +18,11 @@ export interface ActiveCheckInsResponse {
   count: number;
   is_user_checked_in: boolean;
 }
+
+export interface CheckInHistoryItem {
+  court_id: string;
+  court_name: string;
+  court_address: string | null;
+  checked_in_at: string;
+  is_active: boolean;
+}
