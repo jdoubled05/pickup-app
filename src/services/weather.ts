@@ -61,10 +61,7 @@ export async function getWeatherForLocation(
   lon: number
 ): Promise<WeatherData | null> {
   // Check if API key is configured
-  if (!WEATHER_API_KEY) {
-    console.log('Weather API key not configured');
-    return null;
-  }
+  if (!WEATHER_API_KEY) return null;
 
   const gridKey = getGridKey(lat, lon);
   const now = Date.now();
@@ -76,19 +73,22 @@ export async function getWeatherForLocation(
   }
 
   try {
-    // Fetch from WeatherAPI.com
     const url = `https://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=${lat},${lon}&aqi=no`;
 
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
-    if (!response.ok) {
-      console.error('Weather API error:', response.status);
-      return null;
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
     }
+
+    if (!response.ok) return null;
 
     const data = await response.json();
 
-    // Extract weather data
     const condition = mapConditionCode(data.current.condition.code);
     const tempF = Math.round(data.current.temp_f);
     const isDay = data.current.is_day === 1;
@@ -100,15 +100,13 @@ export async function getWeatherForLocation(
       icon,
     };
 
-    // Cache the result
     weatherCache.set(gridKey, {
       data: weatherData,
       expires: now + CACHE_TTL,
     });
 
     return weatherData;
-  } catch (error) {
-    console.error('Error fetching weather:', error);
+  } catch {
     return null;
   }
 }

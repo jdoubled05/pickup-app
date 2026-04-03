@@ -1,10 +1,29 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { supabase, getSupabaseEnvStatus } from "./supabase";
-import type { CheckIn, CheckInInsert, ActiveCheckInsResponse } from "@/src/types/checkins";
+import type { CheckIn, CheckInInsert, ActiveCheckInsResponse, CheckInHistoryItem, CheckInDetailData, CheckInDetailFriend } from "@/src/types/checkins";
 
 const ANONYMOUS_USER_ID_KEY = "anonymous_user_id";
 const CURRENT_CHECK_IN_KEY = "current_check_in_court_id";
+
+/**
+ * Returns the authenticated user ID if signed in, otherwise the anonymous device ID.
+ * Use this everywhere instead of getAnonymousUserId() so check-ins are always
+ * attributed to the right identity.
+ */
+export async function getCurrentUserId(): Promise<string> {
+  try {
+    if (supabase) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user?.id) return session.user.id;
+    }
+  } catch {
+    // Fall through to anonymous ID
+  }
+  return getAnonymousUserId();
+}
 
 /**
  * Gets or generates an anonymous user ID for check-ins
@@ -12,24 +31,14 @@ const CURRENT_CHECK_IN_KEY = "current_check_in_court_id";
  */
 export async function getAnonymousUserId(): Promise<string> {
   try {
-    // Check if we already have an ID stored
     const existingId = await AsyncStorage.getItem(ANONYMOUS_USER_ID_KEY);
-    if (existingId) {
-      return existingId;
-    }
+    if (existingId) return existingId;
 
-    // Generate a new ID using device info
     const deviceId = Constants.deviceId || Constants.sessionId;
-    const timestamp = Date.now();
-    const randomPart = Math.random().toString(36).substring(2, 15);
-    const anonymousId = `anon_${deviceId}_${timestamp}_${randomPart}`;
-
-    // Store for future use
+    const anonymousId = `anon_${deviceId}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
     await AsyncStorage.setItem(ANONYMOUS_USER_ID_KEY, anonymousId);
     return anonymousId;
-  } catch (error) {
-    console.error("Failed to get/generate anonymous user ID:", error);
-    // Fallback to a random ID
+  } catch {
     return `anon_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
   }
 }
@@ -55,32 +64,36 @@ async function setCurrentCheckInCourtId(courtId: string | null): Promise<void> {
     } else {
       await AsyncStorage.setItem(CURRENT_CHECK_IN_KEY, courtId);
     }
-  } catch (error) {
-    console.error("Failed to set current check-in court ID:", error);
+  } catch {
+    // non-critical
   }
 }
 
 /**
- * Creates a check-in for the current user at a court
- * Removes any existing check-in at other courts first (one check-in at a time)
+ * Creates a check-in for the current user at a court.
+ * Expires any existing check-in first (one check-in at a time).
  */
 export async function checkIn(courtId: string): Promise<CheckIn | null> {
   const envStatus = getSupabaseEnvStatus();
-  if (!envStatus.configured || !supabase) {
-    console.warn("Supabase not configured, cannot create check-in");
-    return null;
-  }
+  if (!envStatus.configured || !supabase) return null;
 
   try {
-    const anonymousUserId = await getAnonymousUserId();
+    const userId = await getCurrentUserId();
 
-    // Remove any existing check-ins for this user (enforces one check-in at a time)
+    // Resolve auth UUID separately so we can store it in the typed user_id column
+    let authUserId: string | null = null;
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      authUserId = session?.user?.id ?? null;
+    }
+
+    // Expire any existing check-in (enforces one check-in at a time)
     await checkOut();
 
-    // Create new check-in
     const checkInData: CheckInInsert = {
       court_id: courtId,
-      anonymous_user_id: anonymousUserId,
+      anonymous_user_id: userId,
+      user_id: authUserId,
     };
 
     const { data, error } = await supabase
@@ -89,50 +102,39 @@ export async function checkIn(courtId: string): Promise<CheckIn | null> {
       .select()
       .single();
 
-    if (error) {
-      console.error("Failed to create check-in:", error);
-      return null;
-    }
+    if (error) return null;
 
-    // Track current check-in locally
     await setCurrentCheckInCourtId(courtId);
-
     return data as CheckIn;
-  } catch (error) {
-    console.error("Failed to check in:", error);
+  } catch {
     return null;
   }
 }
 
 /**
- * Removes the current user's check-in (from any court)
+ * Expires the current user's active check-in.
+ * Sets expires_at to NOW() so the checkout time is accurate for the history detail view.
+ * The row is kept in the DB so it appears in check-in history.
  */
 export async function checkOut(): Promise<boolean> {
   const envStatus = getSupabaseEnvStatus();
-  if (!envStatus.configured || !supabase) {
-    return false;
-  }
+  if (!envStatus.configured || !supabase) return false;
 
   try {
-    const anonymousUserId = await getAnonymousUserId();
+    const userId = await getCurrentUserId();
+    const now = new Date().toISOString();
 
-    // Delete all check-ins for this user
     const { error } = await supabase
       .from("check_ins")
-      .delete()
-      .eq("anonymous_user_id", anonymousUserId);
+      .update({ expires_at: now })
+      .eq("anonymous_user_id", userId)
+      .gt("expires_at", now);
 
-    if (error) {
-      console.error("Failed to check out:", error);
-      return false;
-    }
+    if (error) return false;
 
-    // Clear local tracking
     await setCurrentCheckInCourtId(null);
-
     return true;
-  } catch (error) {
-    console.error("Failed to check out:", error);
+  } catch {
     return false;
   }
 }
@@ -142,42 +144,32 @@ export async function checkOut(): Promise<boolean> {
  */
 export async function isCheckedInAtCourt(courtId: string): Promise<boolean> {
   const envStatus = getSupabaseEnvStatus();
-  if (!envStatus.configured || !supabase) {
-    return false;
-  }
+  if (!envStatus.configured || !supabase) return false;
 
   try {
-    const anonymousUserId = await getAnonymousUserId();
+    const userId = await getCurrentUserId();
 
     const { data, error } = await supabase
       .from("check_ins")
       .select("id")
       .eq("court_id", courtId)
-      .eq("anonymous_user_id", anonymousUserId)
+      .eq("anonymous_user_id", userId)
       .gt("expires_at", new Date().toISOString())
       .maybeSingle();
 
-    if (error) {
-      console.error("Failed to check if user is checked in:", error);
-      return false;
-    }
-
+    if (error) return false;
     return !!data;
-  } catch (error) {
-    console.error("Failed to check if user is checked in:", error);
+  } catch {
     return false;
   }
 }
 
 /**
  * Gets the count of active check-ins at a court
- * Returns count of non-expired check-ins
  */
 export async function getActiveCheckInsCount(courtId: string): Promise<number> {
   const envStatus = getSupabaseEnvStatus();
-  if (!envStatus.configured || !supabase) {
-    return 0;
-  }
+  if (!envStatus.configured || !supabase) return 0;
 
   try {
     const { count, error } = await supabase
@@ -186,14 +178,9 @@ export async function getActiveCheckInsCount(courtId: string): Promise<number> {
       .eq("court_id", courtId)
       .gt("expires_at", new Date().toISOString());
 
-    if (error) {
-      console.error("Failed to get check-ins count:", error);
-      return 0;
-    }
-
+    if (error) return 0;
     return count ?? 0;
-  } catch (error) {
-    console.error("Failed to get check-ins count:", error);
+  } catch {
     return 0;
   }
 }
@@ -206,31 +193,22 @@ export async function getActiveCheckIns(
 ): Promise<ActiveCheckInsResponse> {
   const count = await getActiveCheckInsCount(courtId);
   const isUserCheckedIn = await isCheckedInAtCourt(courtId);
-
-  return {
-    court_id: courtId,
-    count,
-    is_user_checked_in: isUserCheckedIn,
-  };
+  return { court_id: courtId, count, is_user_checked_in: isUserCheckedIn };
 }
 
 /**
- * Subscribes to real-time check-in changes for a specific court
- * Returns an unsubscribe function
+ * Subscribes to real-time check-in changes for a specific court.
+ * Returns an unsubscribe function.
  */
 export function subscribeToCheckIns(
   courtId: string,
   callback: (count: number) => void
 ): () => void {
   const envStatus = getSupabaseEnvStatus();
-  if (!envStatus.configured || !supabase) {
-    return () => {}; // No-op cleanup
-  }
+  if (!envStatus.configured || !supabase) return () => {};
 
-  // Initial load
   getActiveCheckInsCount(courtId).then(callback);
 
-  // Subscribe to changes
   const channel = supabase
     .channel(`court-checkins:${courtId}`)
     .on(
@@ -241,30 +219,202 @@ export function subscribeToCheckIns(
         table: "check_ins",
         filter: `court_id=eq.${courtId}`,
       },
-      () => {
-        // Whenever check-ins change, refetch the count
-        getActiveCheckInsCount(courtId).then(callback);
-      }
+      () => getActiveCheckInsCount(courtId).then(callback)
     )
     .subscribe();
 
-  // Return cleanup function
-  return () => {
-    channel.unsubscribe();
-  };
+  return () => channel.unsubscribe();
 }
 
 /**
- * Toggles check-in status for a court
- * If checked in, checks out. If checked out, checks in.
+ * Toggles check-in status for a court.
  */
 export async function toggleCheckIn(courtId: string): Promise<boolean> {
   const isCheckedIn = await isCheckedInAtCourt(courtId);
+  if (isCheckedIn) return checkOut();
+  const result = await checkIn(courtId);
+  return !!result;
+}
 
-  if (isCheckedIn) {
-    return await checkOut();
-  } else {
-    const result = await checkIn(courtId);
-    return !!result;
+/**
+ * Returns the total number of check-ins ever made by the given user ID.
+ */
+export async function getUserCheckInCount(userId: string): Promise<number> {
+  if (!supabase) return 0;
+  try {
+    const { count, error } = await supabase
+      .from("check_ins")
+      .select("id", { count: "exact", head: true })
+      .eq("anonymous_user_id", userId);
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Returns the user's recent check-in history with court details.
+ * Includes both active and expired check-ins, most recent first.
+ */
+export async function getUserCheckInHistory(
+  userId: string,
+  limit = 10
+): Promise<CheckInHistoryItem[]> {
+  if (!supabase) return [];
+  try {
+    const { data: checkIns, error } = await supabase
+      .from("check_ins")
+      .select("id, court_id, expires_at")
+      .eq("anonymous_user_id", userId)
+      .order("expires_at", { ascending: false })
+      .limit(limit);
+
+    if (error || !checkIns || checkIns.length === 0) return [];
+
+    const courtIds = [...new Set(checkIns.map((c) => c.court_id))];
+    const { data: courts } = await supabase
+      .from("courts")
+      .select("id, name, address")
+      .in("id", courtIds);
+
+    const courtMap = new Map((courts ?? []).map((c) => [c.id, c]));
+    const now = new Date().toISOString();
+
+    return checkIns
+      .map((ci) => {
+        const court = courtMap.get(ci.court_id);
+        if (!court) return null;
+        return {
+          id: ci.id,
+          court_id: ci.court_id,
+          court_name: court.name,
+          court_address: court.address,
+          checked_in_at: new Date(
+            new Date(ci.expires_at).getTime() - 3 * 60 * 60 * 1000
+          ).toISOString(),
+          expires_at: ci.expires_at,
+          is_active: ci.expires_at > now,
+        };
+      })
+      .filter((item): item is CheckInHistoryItem => item !== null);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Returns full detail for a single check-in, including checkout type and
+ * any friends who were checked in at the same court during the same session.
+ */
+export async function getCheckInDetail(checkInId: string): Promise<CheckInDetailData | null> {
+  if (!supabase) return null;
+  try {
+    // Fetch check-in row — try with created_at first (available after migration 012)
+    let checkIn: { id: string; court_id: string; user_id: string | null; expires_at: string; created_at?: string } | null = null;
+
+    const { data: withCreatedAt, error: errWithCreatedAt } = await supabase
+      .from("check_ins")
+      .select("id, court_id, user_id, expires_at, created_at")
+      .eq("id", checkInId)
+      .single();
+
+    if (!errWithCreatedAt && withCreatedAt) {
+      checkIn = withCreatedAt;
+    } else {
+      // created_at column may not exist yet — fall back
+      const { data: without, error: errWithout } = await supabase
+        .from("check_ins")
+        .select("id, court_id, user_id, expires_at")
+        .eq("id", checkInId)
+        .single();
+      if (errWithout || !without) return null;
+      checkIn = without;
+    }
+
+    // Fetch court
+    const { data: court } = await supabase
+      .from("courts")
+      .select("name, address")
+      .eq("id", checkIn.court_id)
+      .single();
+
+    const now = new Date().toISOString();
+    const isActive = checkIn.expires_at > now;
+
+    // Derive check-in time: use created_at if available, else expires_at - 3h
+    const checkedInAt = checkIn.created_at
+      ? checkIn.created_at
+      : new Date(new Date(checkIn.expires_at).getTime() - 3 * 60 * 60 * 1000).toISOString();
+
+    // Determine manual vs auto checkout.
+    // Auto-expiry sets expires_at = created_at + 3h exactly.
+    // Manual checkout sets expires_at = NOW() (actual checkout time, < 3h after created_at).
+    // Use 2h55m as the threshold to give a 5-minute buffer around the 3h window.
+    let isManualCheckout: boolean | null = null;
+    if (!isActive && checkIn.created_at) {
+      const durationMs = new Date(checkIn.expires_at).getTime() - new Date(checkIn.created_at).getTime();
+      const autoExpiryMs = 3 * 60 * 60 * 1000;
+      isManualCheckout = durationMs < autoExpiryMs - 5 * 60 * 1000;
+    }
+
+    // Find friends at the same court during this session
+    const friends: CheckInDetailFriend[] = [];
+    const authUserId = checkIn.user_id;
+
+    if (authUserId) {
+      // Get accepted friend IDs
+      const { data: friendships } = await supabase
+        .from("friendships")
+        .select("requester_id, addressee_id")
+        .or(`requester_id.eq.${authUserId},addressee_id.eq.${authUserId}`)
+        .eq("status", "accepted");
+
+      const friendIds = (friendships ?? []).map((f) =>
+        f.requester_id === authUserId ? f.addressee_id : f.requester_id
+      );
+
+      if (friendIds.length > 0) {
+        // Fetch friend check-ins at this court that ended after my session started
+        const { data: friendCheckIns } = await supabase
+          .from("check_ins")
+          .select("user_id, expires_at")
+          .eq("court_id", checkIn.court_id)
+          .in("user_id", friendIds)
+          .gt("expires_at", checkedInAt);
+
+        // Filter to sessions that also started before my session ended
+        const overlapping = (friendCheckIns ?? []).filter((fci) => {
+          const friendStart = new Date(fci.expires_at).getTime() - 3 * 60 * 60 * 1000;
+          return friendStart < new Date(checkIn!.expires_at).getTime();
+        });
+
+        if (overlapping.length > 0) {
+          const userIds = [...new Set(overlapping.map((fci) => fci.user_id).filter(Boolean))] as string[];
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, username, avatar_url")
+            .in("id", userIds);
+
+          for (const p of profiles ?? []) {
+            friends.push({ user_id: p.id, username: p.username, avatar_url: p.avatar_url });
+          }
+        }
+      }
+    }
+
+    return {
+      id: checkIn.id,
+      court_id: checkIn.court_id,
+      court_name: court?.name ?? "Unknown Court",
+      court_address: court?.address ?? null,
+      checked_in_at: checkedInAt,
+      expires_at: checkIn.expires_at,
+      is_active: isActive,
+      is_manual_checkout: isActive ? null : isManualCheckout,
+      friends_at_court: friends,
+    };
+  } catch {
+    return null;
   }
 }

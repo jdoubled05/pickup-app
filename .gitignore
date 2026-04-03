@@ -18,6 +18,10 @@ expo-env.d.ts
 *.key
 *.mobileprovision
 
+# Secrets (p8 keys, certs — never commit these)
+secrets/*
+!secrets/.gitkeep
+
 # Metro
 .metro-health-check*
 
