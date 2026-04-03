@@ -114,6 +114,10 @@ export async function checkIn(courtId: string): Promise<CheckIn | null> {
 /**
  * Expires the current user's active check-in immediately.
  * The row is kept in the DB so it appears in check-in history.
+ *
+ * Sets expires_at to (original_check_in_time + 1s) rather than NOW(),
+ * so that checked_in_at (= expires_at - 3h) still shows the real check-in
+ * time in the history feed.
  */
 export async function checkOut(): Promise<boolean> {
   const envStatus = getSupabaseEnvStatus();
@@ -123,13 +127,28 @@ export async function checkOut(): Promise<boolean> {
     const userId = await getCurrentUserId();
     const now = new Date().toISOString();
 
-    const { error } = await supabase
+    // Find the active check-in to capture its original expires_at
+    const { data: active } = await supabase
       .from("check_ins")
-      .update({ expires_at: now })
+      .select("id, expires_at")
       .eq("anonymous_user_id", userId)
-      .gt("expires_at", now);
+      .gt("expires_at", now)
+      .maybeSingle();
 
-    if (error) return false;
+    if (active) {
+      // Derive original check-in time from expires_at, then set new expires_at
+      // to 1s after that so the row is immediately expired but checked_in_at
+      // (= expires_at - 3h) remains accurate in history.
+      const checkedInAt = new Date(new Date(active.expires_at).getTime() - 3 * 60 * 60 * 1000);
+      const expiredAt = new Date(checkedInAt.getTime() + 1000).toISOString();
+
+      const { error } = await supabase
+        .from("check_ins")
+        .update({ expires_at: expiredAt })
+        .eq("id", active.id);
+
+      if (error) return false;
+    }
 
     await setCurrentCheckInCourtId(null);
     return true;
