@@ -200,7 +200,7 @@ export default function ProfileScreen() {
             {checkInHistory.map((item, i) => (
               <Pressable
                 key={`${item.court_id}-${item.checked_in_at}`}
-                onPress={() => router.push(`/court/${item.court_id}` as never)}
+                onPress={() => router.push(`/checkin/${item.id}` as never)}
                 className={`flex-row items-center px-4 py-3.5 gap-3 bg-white dark:bg-black active:opacity-70 ${
                   i < checkInHistory.length - 1 ? "border-b border-gray-100 dark:border-white/10" : ""
                 }`}

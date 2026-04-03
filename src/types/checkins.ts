@@ -20,9 +20,30 @@ export interface ActiveCheckInsResponse {
 }
 
 export interface CheckInHistoryItem {
+  id: string;
   court_id: string;
   court_name: string;
   court_address: string | null;
   checked_in_at: string;
+  expires_at: string;
   is_active: boolean;
+}
+
+export interface CheckInDetailFriend {
+  user_id: string;
+  username: string;
+  avatar_url: string | null;
+}
+
+export interface CheckInDetailData {
+  id: string;
+  court_id: string;
+  court_name: string;
+  court_address: string | null;
+  checked_in_at: string;
+  expires_at: string;
+  is_active: boolean;
+  /** null = can't determine (created_at not yet in DB) */
+  is_manual_checkout: boolean | null;
+  friends_at_court: CheckInDetailFriend[];
 }

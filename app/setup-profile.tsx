@@ -26,6 +26,7 @@ import {
   PLAY_STYLE_LABELS,
   SKILL_LEVEL_LABELS,
 } from "@/src/types/user";
+import { containsProfanity } from "@/src/utils/profanity";
 
 const USERNAME_COOLDOWN_MS = 365 * 24 * 60 * 60 * 1000; // 1 year
 
@@ -154,6 +155,10 @@ export default function SetupProfileScreen() {
         setError("Username must be at least 2 characters.");
         return;
       }
+      if (containsProfanity(trimmed)) {
+        setError("That username isn't allowed. Please choose a different one.");
+        return;
+      }
     }
     setError(null);
     setConfirmVisible(true);
@@ -186,8 +191,13 @@ export default function SetupProfileScreen() {
       });
       await refreshProfile();
       router.back();
-    } catch {
-      setError("Failed to save profile. Please try again.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("inappropriate content") || msg.includes("Username")) {
+        setError("That username isn't allowed. Please choose a different one.");
+      } else {
+        setError("Failed to save profile. Please try again.");
+      }
     } finally {
       setSaving(false);
     }

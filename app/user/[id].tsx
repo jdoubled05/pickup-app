@@ -23,6 +23,8 @@ import {
   removeFriend,
 } from "@/src/services/friends";
 import type { UserPublicProfile, ActiveCheckIn } from "@/src/services/friends";
+import { getUserCheckInHistory } from "@/src/services/checkins";
+import type { CheckInHistoryItem } from "@/src/types/checkins";
 import { PLAY_STYLE_LABELS, SKILL_LEVEL_LABELS } from "@/src/types/user";
 import type { PlayStyle, SkillLevel } from "@/src/types/user";
 
@@ -31,6 +33,20 @@ function memberSince(isoDate: string): string {
     month: "long",
     year: "numeric",
   });
+}
+
+function formatCheckInTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 60) return diffMins <= 1 ? "Just now" : `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays === 1) return `Yesterday · ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  if (diffDays < 7) return `${diffDays}d ago · ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function UserProfileScreen() {
@@ -43,6 +59,7 @@ export default function UserProfileScreen() {
 
   const [profile, setProfile] = React.useState<UserPublicProfile | null>(null);
   const [activeCheckIn, setActiveCheckIn] = React.useState<ActiveCheckIn | null>(null);
+  const [checkInHistory, setCheckInHistory] = React.useState<CheckInHistoryItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [actionLoading, setActionLoading] = React.useState(false);
 
@@ -51,9 +68,11 @@ export default function UserProfileScreen() {
     Promise.all([
       getUserPublicProfile(id),
       getUserActiveCheckIn(id),
-    ]).then(([p, ci]) => {
+      getUserCheckInHistory(id),
+    ]).then(([p, ci, history]) => {
       setProfile(p);
       setActiveCheckIn(ci);
+      setCheckInHistory(history);
       setLoading(false);
     });
   }, [id]);
@@ -264,6 +283,53 @@ export default function UserProfileScreen() {
                     {PLAY_STYLE_LABELS[style as PlayStyle] ?? style}
                   </Text>
                 </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Recent Activity */}
+        {checkInHistory.length > 0 && (
+          <View className="mx-4 mb-4">
+            <Text className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-white/40 mb-3 px-2">
+              Recent Activity
+            </Text>
+            <View className="rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+              {checkInHistory.map((item, i) => (
+                <Pressable
+                  key={`${item.court_id}-${item.checked_in_at}`}
+                  onPress={() => router.push(`/court/${item.court_id}` as never)}
+                  className={`flex-row items-center px-4 py-3.5 gap-3 bg-white dark:bg-black active:opacity-70 ${
+                    i < checkInHistory.length - 1 ? "border-b border-gray-100 dark:border-white/10" : ""
+                  }`}
+                >
+                  <View className="w-9 h-9 rounded-full bg-red-700/10 dark:bg-red-700/20 items-center justify-center">
+                    <Ionicons name="basketball" size={16} color="#960000" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="font-semibold text-gray-900 dark:text-white" numberOfLines={1}>
+                      {item.court_name}
+                    </Text>
+                    {item.court_address ? (
+                      <Text className="text-xs text-gray-500 dark:text-white/40 mt-0.5" numberOfLines={1}>
+                        {item.court_address}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View className="items-end gap-1">
+                    {item.is_active ? (
+                      <View className="flex-row items-center gap-1">
+                        <View className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <Text className="text-xs font-medium text-green-600 dark:text-green-400">Active</Text>
+                      </View>
+                    ) : (
+                      <Text className="text-xs text-gray-400 dark:text-white/30">
+                        {formatCheckInTime(item.checked_in_at)}
+                      </Text>
+                    )}
+                    <Ionicons name="chevron-forward" size={14} color={isDark ? "rgba(255,255,255,0.2)" : "#d1d5db"} />
+                  </View>
+                </Pressable>
               ))}
             </View>
           </View>
