@@ -14,10 +14,6 @@ import { AuthProvider } from "@/src/context/AuthContext";
 import { supabase } from "@/src/services/supabase";
 import { setCurrentUser } from "@/src/services/savedCourts";
 
-export const unstable_settings = {
-  initialRouteName: "(tabs)",
-};
-
 export default function RootLayout() {
   const router = useRouter();
   const colorScheme = useColorScheme();
