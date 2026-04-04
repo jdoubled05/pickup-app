@@ -1,0 +1,51 @@
+appId: com.simbasghost.pickupnativewindclean
+tags:
+  - profile
+  - smoke
+---
+# Profile tab: navigation, signed-out state, quick links
+
+- launchApp
+- waitForAnimationToEnd
+- waitForAnimationToEnd
+- openLink: "exp+pickup-nativewind-clean://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8082"
+- extendedWaitUntil:
+    visible:
+      text: "Search courts..."
+    timeout: 30000
+
+# Wait for courts to fully load so the tab bar is interactive
+- extendedWaitUntil:
+    visible:
+      id: "court-card"
+    timeout: 20000
+
+# Navigate to Profile tab
+- tapOn:
+    id: "profile-tab"
+- extendedWaitUntil:
+    visible: "Profile"
+    timeout: 10000
+
+# Signed-out state: sign-in CTA (asserting on accessibilityLabel, not inner Text node)
+- assertVisible: "Sign in to your account"
+
+# Quick links (asserting on accessibilityLabels set on Pressable/Button)
+- assertVisible:
+    id: "saved-courts-button"
+- assertVisible: "Browse all courts"
+- assertVisible: "Submit a new court"
+
+# Tapping Saved Courts navigates to saved screen
+- tapOn:
+    id: "saved-courts-button"
+- extendedWaitUntil:
+    visible:
+      id: "empty-saved-courts"
+    timeout: 10000
+
+# Go back to profile
+- tapOn:
+    point: "5%, 10%"
+- waitForAnimationToEnd
+- assertVisible: "Profile"

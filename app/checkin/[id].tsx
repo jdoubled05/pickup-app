@@ -13,6 +13,7 @@ import { Text } from "@/src/components/ui/Text";
 import { Avatar } from "@/src/components/Avatar";
 import { getCheckInDetail } from "@/src/services/checkins";
 import type { CheckInDetailData } from "@/src/types/checkins";
+import { formatDuration } from "@/src/utils/checkinFormatting";
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso);
@@ -24,15 +25,6 @@ function formatDateTime(iso: string): string {
     hour: "numeric",
     minute: "2-digit",
   });
-}
-
-function formatDuration(checkedInAt: string, expiresAt: string): string {
-  const ms = new Date(expiresAt).getTime() - new Date(checkedInAt).getTime();
-  const totalMins = Math.round(ms / 60000);
-  if (totalMins < 60) return `${totalMins}m`;
-  const hrs = Math.floor(totalMins / 60);
-  const mins = totalMins % 60;
-  return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
 }
 
 export default function CheckInDetailScreen() {

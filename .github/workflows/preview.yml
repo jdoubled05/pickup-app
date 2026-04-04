@@ -1,0 +1,89 @@
+name: Preview build & update
+
+on:
+  push:
+    branches: [dev]
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Detect which files changed ───────────────────────────────────────────────
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      native: ${{ steps.filter.outputs.native }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            native:
+              - 'package.json'
+              - 'package-lock.json'
+              - 'app.config.js'
+              - 'app.json'
+              - 'ios/**'
+              - 'android/**'
+              - 'eas.json'
+
+  # ─── OTA update (every push) ──────────────────────────────────────────────────
+  ota-update:
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_KEY }}
+
+      - name: Push OTA update to preview channel
+        run: |
+          eas update \
+            --branch dev \
+            --channel preview \
+            --message "OTA from dev@${{ github.sha }}" \
+            --non-interactive
+
+  # ─── Full native build (only when native files change) ────────────────────────
+  native-build:
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_KEY }}
+
+      - name: Build preview (iOS)
+        run: |
+          eas build \
+            --profile preview \
+            --platform ios \
+            --non-interactive \
+            --no-wait
