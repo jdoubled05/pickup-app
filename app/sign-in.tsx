@@ -99,13 +99,13 @@ export default function SignInScreen() {
       <View className="gap-3">
         {/* Apple Sign In — iOS only */}
         {Platform.OS === "ios" && (
-          <Pressable
-            disabled={!!loading}
-            className="flex-row items-center justify-center rounded-2xl bg-black dark:bg-white px-5 gap-3"
+          <View
             style={{ opacity: loading === "apple" ? 0.6 : 1, height: 50 }}
           >
             {loading === "apple" ? (
-              <ActivityIndicator size="small" color={isDark ? "#000" : "#fff"} />
+              <View className="flex-1 flex-row items-center justify-center rounded-2xl bg-black dark:bg-white">
+                <ActivityIndicator size="small" color={isDark ? "#000" : "#fff"} />
+              </View>
             ) : (
               <AppleAuthentication.AppleAuthenticationButton
                 buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
@@ -119,7 +119,7 @@ export default function SignInScreen() {
                 onPress={handleApple}
               />
             )}
-          </Pressable>
+          </View>
         )}
 
         {/* Google Sign In */}
