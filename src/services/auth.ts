@@ -18,14 +18,15 @@ export async function signInWithApple(): Promise<AuthResult | null> {
     ],
   });
 
-  if (!credential.identityToken) return null;
+  if (!credential.identityToken) throw new Error("Apple did not return an identity token");
 
   const { data, error } = await supabase.auth.signInWithIdToken({
     provider: "apple",
     token: credential.identityToken,
   });
 
-  if (error || !data.user || !data.session) return null;
+  if (error) throw new Error(error.message);
+  if (!data.user || !data.session) throw new Error("No session returned from Supabase");
 
   const givenName = credential.fullName?.givenName;
   const familyName = credential.fullName?.familyName;
