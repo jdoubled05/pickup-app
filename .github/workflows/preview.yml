@@ -54,6 +54,7 @@ jobs:
         run: |
           eas update \
             --channel preview \
+            --environment preview \
             --message "OTA from dev@${{ github.sha }}" \
             --non-interactive
 
@@ -84,5 +85,6 @@ jobs:
           eas build \
             --profile preview \
             --platform ios \
+            --environment preview \
             --non-interactive \
             --no-wait
