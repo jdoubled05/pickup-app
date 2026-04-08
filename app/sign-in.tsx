@@ -12,7 +12,6 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text } from "@/src/components/ui/Text";
 import { signInWithApple, signInWithGoogle, getProfile } from "@/src/services/auth";
-import { getSupabaseEnvStatus } from "@/src/services/supabase";
 
 export default function SignInScreen() {
   const router = useRouter();
@@ -147,13 +146,6 @@ export default function SignInScreen() {
 
       {error ? (
         <Text className="mt-4 text-center text-sm text-red-500">{error}</Text>
-      ) : null}
-
-      {/* Temporary debug — remove after diagnosing */}
-      {!getSupabaseEnvStatus().configured ? (
-        <Text className="mt-2 text-center text-xs text-orange-500">
-          ⚠️ Supabase not configured: {getSupabaseEnvStatus().reason}
-        </Text>
       ) : null}
 
       {/* Fine print */}
