@@ -54,11 +54,9 @@ jobs:
         run: |
           eas update \
             --channel preview \
+            --environment preview \
             --message "OTA from dev@${{ github.sha }}" \
             --non-interactive
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_LEGACY_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_LEGACY_ANON_KEY }}
 
   # ─── Full native build (only when native files change) ────────────────────────
   native-build:
@@ -87,8 +85,6 @@ jobs:
           eas build \
             --profile preview \
             --platform ios \
+            --environment preview \
             --non-interactive \
             --no-wait
-        env:
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_LEGACY_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_LEGACY_ANON_KEY }}
