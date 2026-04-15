@@ -120,7 +120,7 @@ export default function SettingsScreen() {
       </Text>
       <View className="rounded-2xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 overflow-hidden mb-6">
         <Pressable
-          onPress={() => Linking.openURL("https://privacy.runpickup.com/")}
+          onPress={() => Linking.openURL("https://privacy-site-five.vercel.app/")}
           className="flex-row items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-white/10"
           accessibilityLabel="View Privacy Policy"
           accessibilityRole="link"
@@ -132,7 +132,7 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-forward" size={16} color={isDark ? "#ffffff40" : "#9ca3af"} />
         </Pressable>
         <Pressable
-          onPress={() => Linking.openURL("https://privacy.runpickup.com/terms")}
+          onPress={() => Linking.openURL("https://privacy-site-five.vercel.app/terms")}
           className="flex-row items-center justify-between px-4 py-4 border-b border-gray-200 dark:border-white/10"
           accessibilityLabel="View Terms of Service"
           accessibilityRole="link"
