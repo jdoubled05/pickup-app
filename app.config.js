@@ -1,5 +1,5 @@
 const suffix = process.env.APP_BUNDLE_ID_SUFFIX ?? "";
-const bundleId = `com.simbasghost.pickup${suffix}`;
+const bundleId = `com.hardwoodstudio.pickup${suffix}`;
 const appName = suffix ? "pickup. (dev)" : "pickup.";
 
 /** @type {import('expo/config').ExpoConfig} */
@@ -35,11 +35,7 @@ module.exports = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: bundleId,
-    permissions: [
-      "CAMERA",
-      "READ_EXTERNAL_STORAGE",
-      "WRITE_EXTERNAL_STORAGE",
-    ],
+    permissions: ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"],
   },
   web: {
     favicon: "./assets/images/favicon.png",
