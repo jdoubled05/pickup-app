@@ -1,6 +1,6 @@
 const suffix = process.env.APP_BUNDLE_ID_SUFFIX ?? "";
 const bundleId = `com.hardwoodstudio.pickup${suffix}`;
-const appName = suffix ? "pickup. (dev)" : "pickup.";
+const appName = suffix ? "pickup• (dev)" : "pickup•";
 
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
