@@ -82,7 +82,8 @@ export async function signInWithGoogle(): Promise<AuthResult | null> {
 
   if (code) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error || !data.user || !data.session) return null;
+    if (error) throw new Error(error.message);
+    if (!data.user || !data.session) return null;
     sessionData = { user: data.user, session: data.session };
   } else {
     const { data, error } = await supabase.auth.setSession({

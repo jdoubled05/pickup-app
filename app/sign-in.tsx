@@ -46,7 +46,11 @@ export default function SignInScreen() {
       ) {
         return;
       }
-      setError("Apple sign-in failed. Please try again.");
+      if (err instanceof Error && err.message.includes("Multiple accounts with the same email")) {
+        setError("An account with this email already exists. Please sign in with Google instead.");
+      } else {
+        setError("Apple sign-in failed. Please try again.");
+      }
     } finally {
       setLoading(null);
     }
@@ -62,8 +66,12 @@ export default function SignInScreen() {
       } else {
         setError("Google sign-in was cancelled.");
       }
-    } catch {
-      setError("Google sign-in failed. Please try again.");
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("Multiple accounts with the same email")) {
+        setError("An account with this email already exists. Please sign in with Apple instead.");
+      } else {
+        setError("Google sign-in failed. Please try again.");
+      }
     } finally {
       setLoading(null);
     }
