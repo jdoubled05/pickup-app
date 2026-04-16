@@ -139,20 +139,18 @@ export default function MapsTest() {
     const parsedLat = lat ? parseFloat(lat) : NaN;
     const parsedLon = lon ? parseFloat(lon) : NaN;
     const hasFocusCoords = Number.isFinite(parsedLat) && Number.isFinite(parsedLon);
-    let coords: { lat: number; lon: number };
-    if (hasFocusCoords) {
-      coords = { lat: parsedLat, lon: parsedLon };
-    } else {
-      const location = await getForegroundLocationOrDefault();
-      coords = location.coords;
-      setCenter(location.coords);
-      setLocationSource(location.source);
+    // Always get user location for distance calculations
+    const userLocation = await getForegroundLocationOrDefault();
+    setLocationSource(userLocation.source);
+    if (!hasFocusCoords) {
+      setCenter(userLocation.coords);
     }
     setInitialCenterReady(true);
     skipRegionFetchRef.current += 1;
     setRecenterSignal((v) => v + 1);
     try {
-      await fetchCourts(coords);
+      // Always fetch using user's location so distance_meters is relative to the user
+      await fetchCourts(userLocation.coords);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load courts.");
     } finally {
