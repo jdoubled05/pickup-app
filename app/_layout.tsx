@@ -74,7 +74,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: isDark ? "#000" : "#fff" },
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen
           name="onboarding"
           options={{ headerShown: false, presentation: "fullScreenModal", gestureEnabled: false }}
