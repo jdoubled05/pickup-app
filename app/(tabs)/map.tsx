@@ -199,13 +199,17 @@ export default function MapsTest() {
     loadFilters().then(setFilters);
   }, []);
 
-  // Auto-select the focused court once courts have loaded
+  // Auto-select the focused court once courts have loaded (only fires once per focusCourtId)
+  const autoSelectedCourtRef = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (focusCourtId && courts.length > 0 && !selectedCourt) {
+    if (focusCourtId && courts.length > 0 && autoSelectedCourtRef.current !== focusCourtId) {
       const match = courts.find((c) => c.id === focusCourtId);
-      if (match) setSelectedCourt(match);
+      if (match) {
+        autoSelectedCourtRef.current = focusCourtId;
+        setSelectedCourt(match);
+      }
     }
-  }, [focusCourtId, courts, selectedCourt]);
+  }, [focusCourtId, courts]);
 
   // Subscribe to real-time activity updates so the map reflects check-ins live
   React.useEffect(() => {
