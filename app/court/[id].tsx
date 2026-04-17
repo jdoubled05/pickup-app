@@ -440,7 +440,7 @@ export default function CourtDetails() {
                 <Pressable
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.replace(`/(tabs)/map?lat=${court.latitude}&lon=${court.longitude}&courtId=${court.id}` as never);
+                    router.navigate(`/(tabs)/map?lat=${court.latitude}&lon=${court.longitude}&courtId=${court.id}` as never);
                   }}
                   className="mr-3 flex-1 items-center py-3"
                   accessibilityLabel={`Show ${court.name} on map`}
@@ -501,7 +501,7 @@ export default function CourtDetails() {
                 longitude={court.longitude}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.replace(`/(tabs)/map?lat=${court.latitude}&lon=${court.longitude}&courtId=${court.id}` as never);
+                  router.navigate(`/(tabs)/map?lat=${court.latitude}&lon=${court.longitude}&courtId=${court.id}` as never);
                 }}
               />
             </View>
