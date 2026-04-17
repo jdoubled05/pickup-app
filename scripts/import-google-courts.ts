@@ -235,7 +235,7 @@ function parseGoogleAddress(addr: string): {
 // Transform Google Place → CourtInsert
 // ---------------------------------------------------------------------------
 
-function transformGooglePlace(place: GooglePlace): CourtInsert {
+function transformGooglePlace(place: GooglePlace, timezone: string): CourtInsert {
   const lat = place.geometry.location.lat;
   const lon = place.geometry.location.lng;
   const lowerName = place.name.toLowerCase();
@@ -274,7 +274,7 @@ function transformGooglePlace(place: GooglePlace): CourtInsert {
     state,
     postal_code,
     country: 'US',
-    timezone: 'America/New_York',
+    timezone,
     indoor,
     surface_type: indoor ? 'hardwood' : null,
     num_hoops: null,
@@ -295,47 +295,162 @@ function transformGooglePlace(place: GooglePlace): CourtInsert {
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// City configs
 // ---------------------------------------------------------------------------
 
-// Atlanta metro center point and dedup radius.
-// Radius matches the OSM metroBbox (~120 km across the 30-county MSA).
-const ATLANTA_CENTER = { lat: 33.749, lon: -84.388 };
-const DEDUP_RADIUS_M = 120000; // load existing courts within 120 km for dedup
+interface CityConfig {
+  label: string;
+  center: { lat: number; lon: number };
+  dedupRadiusM: number;
+  timezone: string;
+  queries: string[];
+}
+
+const CITY_CONFIGS: Record<string, CityConfig> = {
+  atlanta: {
+    label: 'Atlanta, GA',
+    center: { lat: 33.749, lon: -84.388 },
+    dedupRadiusM: 120000,
+    timezone: 'America/New_York',
+    queries: [
+      'indoor basketball court Atlanta GA',
+      'YMCA Atlanta GA',
+      'recreation center basketball Atlanta GA',
+      'community center basketball Atlanta GA',
+      'basketball gym Atlanta GA',
+      'YMCA Marietta GA',
+      'recreation center basketball Marietta GA',
+      'YMCA Roswell GA',
+      'recreation center basketball Alpharetta GA',
+      'YMCA Kennesaw GA',
+      'community center basketball Sandy Springs GA',
+      'YMCA Decatur GA',
+      'recreation center basketball Lawrenceville GA',
+      'YMCA Duluth GA',
+      'community center basketball Gwinnett GA',
+      'YMCA Peachtree City GA',
+      'recreation center basketball Fayetteville GA',
+      'YMCA Smyrna GA',
+    ],
+  },
+  'los angeles': {
+    label: 'Los Angeles, CA',
+    center: { lat: 34.052, lon: -118.244 },
+    dedupRadiusM: 80000,
+    timezone: 'America/Los_Angeles',
+    queries: [
+      // City proper
+      'indoor basketball court Los Angeles CA',
+      'YMCA Los Angeles CA',
+      'recreation center basketball Los Angeles CA',
+      'community center basketball Los Angeles CA',
+      'basketball gym Los Angeles CA',
+      // West side
+      'YMCA Santa Monica CA',
+      'recreation center basketball Santa Monica CA',
+      'YMCA Culver City CA',
+      'community center basketball Venice CA',
+      // San Fernando Valley
+      'YMCA Burbank CA',
+      'recreation center basketball Van Nuys CA',
+      'YMCA Glendale CA',
+      'community center basketball North Hollywood CA',
+      // South LA / Long Beach
+      'YMCA Long Beach CA',
+      'recreation center basketball Compton CA',
+      'YMCA Inglewood CA',
+      'community center basketball Hawthorne CA',
+      // East LA / SGV
+      'YMCA Pasadena CA',
+      'recreation center basketball East Los Angeles CA',
+      'YMCA Alhambra CA',
+      'community center basketball Pomona CA',
+      // South Bay
+      'YMCA Torrance CA',
+      'recreation center basketball Carson CA',
+      'YMCA El Segundo CA',
+    ],
+  },
+  'new york': {
+    label: 'New York City, NY',
+    center: { lat: 40.712, lon: -74.006 },
+    dedupRadiusM: 80000,
+    timezone: 'America/New_York',
+    queries: [
+      // Manhattan
+      'indoor basketball court Manhattan NY',
+      'YMCA Manhattan New York',
+      'recreation center basketball Manhattan NY',
+      'community center basketball Manhattan NY',
+      'basketball gym Manhattan NY',
+      // Brooklyn
+      'YMCA Brooklyn NY',
+      'recreation center basketball Brooklyn NY',
+      'community center basketball Brooklyn NY',
+      // Queens
+      'YMCA Queens NY',
+      'recreation center basketball Flushing NY',
+      'community center basketball Jamaica NY',
+      // Bronx
+      'YMCA Bronx NY',
+      'recreation center basketball Bronx NY',
+      'community center basketball South Bronx NY',
+      // Staten Island
+      'YMCA Staten Island NY',
+      'recreation center basketball Staten Island NY',
+      // New Jersey (close to NYC)
+      'YMCA Jersey City NJ',
+      'recreation center basketball Hoboken NJ',
+      'YMCA Newark NJ',
+      'community center basketball Yonkers NY',
+    ],
+  },
+  'washington dc': {
+    label: 'Washington, DC',
+    center: { lat: 38.907, lon: -77.037 },
+    dedupRadiusM: 60000,
+    timezone: 'America/New_York',
+    queries: [
+      // DC proper
+      'indoor basketball court Washington DC',
+      'YMCA Washington DC',
+      'recreation center basketball Washington DC',
+      'community center basketball Washington DC',
+      'basketball gym Washington DC',
+      // Virginia suburbs
+      'YMCA Arlington VA',
+      'recreation center basketball Alexandria VA',
+      'YMCA Reston VA',
+      'community center basketball Falls Church VA',
+      // Maryland suburbs
+      'YMCA Silver Spring MD',
+      'recreation center basketball Bethesda MD',
+      'YMCA Rockville MD',
+      'community center basketball College Park MD',
+      'YMCA Hyattsville MD',
+    ],
+  },
+};
+
 const DEDUP_DISTANCE_M = 50;
 
-// Queries focused on indoor venues that OSM typically misses.
-// Outdoor courts already covered by import-osm-courts.ts.
-// City-proper queries + major suburb queries to match OSM metro coverage.
-const SEARCH_QUERIES = [
-  // City proper
-  'indoor basketball court Atlanta GA',
-  'YMCA Atlanta GA',
-  'recreation center basketball Atlanta GA',
-  'community center basketball Atlanta GA',
-  'basketball gym Atlanta GA',
-  // North metro
-  'YMCA Marietta GA',
-  'recreation center basketball Marietta GA',
-  'YMCA Roswell GA',
-  'recreation center basketball Alpharetta GA',
-  'YMCA Kennesaw GA',
-  'community center basketball Sandy Springs GA',
-  // East metro
-  'YMCA Decatur GA',
-  'recreation center basketball Lawrenceville GA',
-  'YMCA Duluth GA',
-  'community center basketball Gwinnett GA',
-  // South metro
-  'YMCA Peachtree City GA',
-  'recreation center basketball Fayetteville GA',
-  'YMCA Smyrna GA',
-];
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
   const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
   if (!SUPABASE_URL) {
     console.error('Missing EXPO_PUBLIC_SUPABASE_URL in .env.local');
+    process.exit(1);
+  }
+
+  // Parse --city flag
+  const cityArg = process.argv.find(a => a.startsWith('--city='))?.replace('--city=', '').toLowerCase()
+    ?? 'atlanta';
+  const config = CITY_CONFIGS[cityArg];
+  if (!config) {
+    console.error(`Unknown city: "${cityArg}". Available: ${Object.keys(CITY_CONFIGS).join(', ')}`);
     process.exit(1);
   }
 
@@ -345,23 +460,24 @@ async function main(): Promise<void> {
 
   console.log('');
   console.log('=== Google Places Indoor Court Importer ===');
-  console.log(`Center: ${ATLANTA_CENTER.lat}, ${ATLANTA_CENTER.lon}`);
-  console.log(`Dedup radius: ${DEDUP_RADIUS_M / 1000} km`);
+  console.log(`City: ${config.label}`);
+  console.log(`Center: ${config.center.lat}, ${config.center.lon}`);
+  console.log(`Dedup radius: ${config.dedupRadiusM / 1000} km`);
   console.log('');
 
   // 1. Fetch existing courts for dedup
   const existing = await fetchExistingCourts(
     supabase,
-    ATLANTA_CENTER.lat,
-    ATLANTA_CENTER.lon,
-    DEDUP_RADIUS_M
+    config.center.lat,
+    config.center.lon,
+    config.dedupRadiusM
   );
 
   // 2. Run all Google Places queries, collecting unique places
   console.log('\nQuerying Google Places...');
   const allPlaces = new Map<string, GooglePlace>();
 
-  for (const query of SEARCH_QUERIES) {
+  for (const query of config.queries) {
     console.log(`   "${query}"...`);
     try {
       const places = await fetchAllPlaces(query, googleKey);
@@ -384,8 +500,8 @@ async function main(): Promise<void> {
     const lat = place.geometry.location.lat;
     const lon = place.geometry.location.lng;
 
-    // Skip if outside the Atlanta metro area entirely
-    if (haversineMeters(lat, lon, ATLANTA_CENTER.lat, ATLANTA_CENTER.lon) > DEDUP_RADIUS_M) continue;
+    // Skip if outside the city metro area entirely
+    if (haversineMeters(lat, lon, config.center.lat, config.center.lon) > config.dedupRadiusM) continue;
 
     // Skip if within 50m of an existing DB court
     const tooCloseToExisting = existing.some(
@@ -399,7 +515,7 @@ async function main(): Promise<void> {
     );
     if (tooCloseToQueued) continue;
 
-    newCourts.push(transformGooglePlace(place));
+    newCourts.push(transformGooglePlace(place, config.timezone));
   }
 
   const indoorCount = newCourts.filter(c => c.indoor).length;

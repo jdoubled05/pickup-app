@@ -17,7 +17,7 @@
  *   --replace    Delete all existing courts before importing
  *
  * Available cities: atlanta, los angeles, new york, chicago, houston, phoenix,
- *                   philadelphia, san antonio, san diego, dallas
+ *                   philadelphia, san antonio, san diego, dallas, washington dc
  *
  * Find custom bounding boxes at: https://boundingbox.klokantech.com/
  */
@@ -218,26 +218,20 @@ function deduplicateCourts(courts: Court[], thresholdMeters: number = 50): Court
 }
 
 /**
- * Fetch basketball courts from OpenStreetMap using Overpass API
+ * Run a single Overpass query for a bounding box
  */
-async function fetchOSMCourts(bbox: string): Promise<OSMResponse> {
-  const [west, south, east, north] = bbox.split(',').map(parseFloat);
-
+async function queryOverpass(south: number, west: number, north: number, east: number): Promise<OSMElement[]> {
   const query = `
     [out:json][timeout:90];
     (
-      // Outdoor basketball courts (pitches)
       node["leisure"="pitch"]["sport"="basketball"](${south},${west},${north},${east});
       way["leisure"="pitch"]["sport"="basketball"](${south},${west},${north},${east});
       relation["leisure"="pitch"]["sport"="basketball"](${south},${west},${north},${east});
-      // Indoor-tagged pitches
       node["leisure"="pitch"]["sport"="basketball"]["indoor"="yes"](${south},${west},${north},${east});
       way["leisure"="pitch"]["sport"="basketball"]["indoor"="yes"](${south},${west},${north},${east});
-      // Sports halls and gyms with basketball
       node["leisure"="sports_hall"]["sport"="basketball"](${south},${west},${north},${east});
       way["leisure"="sports_hall"]["sport"="basketball"](${south},${west},${north},${east});
       relation["leisure"="sports_hall"]["sport"="basketball"](${south},${west},${north},${east});
-      // Sports centres with basketball (YMCAs, rec centers)
       node["leisure"="sports_centre"]["sport"="basketball"](${south},${west},${north},${east});
       way["leisure"="sports_centre"]["sport"="basketball"](${south},${west},${north},${east});
       relation["leisure"="sports_centre"]["sport"="basketball"](${south},${west},${north},${east});
@@ -245,19 +239,57 @@ async function fetchOSMCourts(bbox: string): Promise<OSMResponse> {
     out center body;
   `;
 
-  console.log('🌍 Querying OpenStreetMap Overpass API...');
-
   const response = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: `data=${encodeURIComponent(query)}`,
   });
 
-  if (!response.ok) {
-    throw new Error(`OSM API error: ${response.statusText}`);
+  if (!response.ok) throw new Error(`OSM API error: ${response.statusText}`);
+  const data = await response.json() as OSMResponse;
+  return data.elements ?? [];
+}
+
+/**
+ * Fetch basketball courts from OpenStreetMap, splitting bbox into quadrants if needed
+ */
+async function fetchOSMCourts(bbox: string): Promise<OSMResponse> {
+  const [west, south, east, north] = bbox.split(',').map(parseFloat);
+  const midLat = (south + north) / 2;
+  const midLon = (west + east) / 2;
+
+  // Split into 4 quadrants to avoid Overpass timeouts on large/dense areas
+  const quadrants = [
+    { s: south, w: west,   n: midLat, e: midLon }, // SW
+    { s: south, w: midLon, n: midLat, e: east   }, // SE
+    { s: midLat, w: west,  n: north,  e: midLon }, // NW
+    { s: midLat, w: midLon, n: north, e: east   }, // NE
+  ];
+
+  const allElements: OSMElement[] = [];
+  const seenIds = new Set<string>();
+
+  for (let i = 0; i < quadrants.length; i++) {
+    const { s, w, n, e } = quadrants[i];
+    console.log(`🌍 Querying OpenStreetMap quadrant ${i + 1}/4...`);
+    try {
+      const elements = await queryOverpass(s, w, n, e);
+      for (const el of elements) {
+        const key = `${el.type}-${el.id}`;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          allElements.push(el);
+        }
+      }
+      console.log(`   ✓ ${elements.length} elements (${allElements.length} total unique)`);
+      // Brief pause between quadrant queries to be polite to the API
+      if (i < quadrants.length - 1) await new Promise(r => setTimeout(r, 2000));
+    } catch (err) {
+      console.warn(`   ⚠️  Quadrant ${i + 1} failed: ${err instanceof Error ? err.message : err}`);
+    }
   }
 
-  return response.json();
+  return { elements: allElements };
 }
 
 /**
@@ -509,6 +541,11 @@ const CITIES: { [key: string]: { bbox: string; metroBbox: string; state: string 
     bbox: '-97.039,32.617,-96.463,33.023',           // City proper (~340 sq mi)
     metroBbox: '-97.084,32.543,-96.463,33.168',      // Metro: includes Irving, parts of Fort Worth metro
     state: 'TX',
+  },
+  'washington dc': {
+    bbox: '-77.120,38.791,-76.909,38.995',           // District proper
+    metroBbox: '-77.510,38.594,-76.805,39.220',      // Metro: includes Arlington, Alexandria, Silver Spring, Bethesda, Rockville
+    state: 'DC',
   },
 };
 

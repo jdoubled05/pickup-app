@@ -109,12 +109,30 @@ export default function MapsTest() {
   const viewportCenterRef = useRef(center);
   // Generation counter — increments on each fetch; stale responses are discarded
   const fetchGenerationRef = useRef(0);
+  // User's real GPS location — used to compute distances regardless of map center
+  const userCoordsRef = useRef<{ lat: number; lon: number } | null>(null);
 
   const fetchCourts = React.useCallback(async (coords: { lat: number; lon: number }, radiusMeters = 50000) => {
     const generation = ++fetchGenerationRef.current;
     const data = await listCourtsNearby(coords.lat, coords.lon, radiusMeters);
     if (generation !== fetchGenerationRef.current) return;
-    setCourts(data);
+
+    // Re-compute distance_meters from user's actual GPS location so distances
+    // are always relative to the user, not the map center / search location.
+    const userCoords = userCoordsRef.current;
+    const courts = userCoords
+      ? data.map(court => {
+          const dLat = (court.latitude - userCoords.lat) * (Math.PI / 180);
+          const dLon = (court.longitude - userCoords.lon) * (Math.PI / 180);
+          const a =
+            Math.sin(dLat / 2) ** 2 +
+            Math.cos(userCoords.lat * (Math.PI / 180)) *
+              Math.cos(court.latitude * (Math.PI / 180)) *
+              Math.sin(dLon / 2) ** 2;
+          return { ...court, distance_meters: 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) };
+        })
+      : data;
+    setCourts(courts);
 
     // Fetch activity data for all courts
     if (supabaseStatus.configured && data.length > 0) {
@@ -126,6 +144,7 @@ export default function MapsTest() {
 
   const recenterToDevice = React.useCallback(async () => {
     const result = await getForegroundLocationOrDefault();
+    userCoordsRef.current = result.coords;
     setCenter(result.coords);
     setLocationSource(result.source);
     await fetchCourts(result.coords);
@@ -141,6 +160,7 @@ export default function MapsTest() {
     const hasFocusCoords = Number.isFinite(parsedLat) && Number.isFinite(parsedLon);
     // Always get user location for distance calculations
     const userLocation = await getForegroundLocationOrDefault();
+    userCoordsRef.current = userLocation.coords;
     setLocationSource(userLocation.source);
     if (!hasFocusCoords) {
       setCenter(userLocation.coords);
