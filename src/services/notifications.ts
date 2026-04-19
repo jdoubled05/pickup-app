@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Court } from './courts';
 
@@ -64,12 +65,23 @@ export async function showCheckInNotification(
 /**
  * Configure the notification handler for foreground notifications
  */
-export function configureNotificationHandler(): void {
+export async function configureNotificationHandler(): Promise<void> {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     }),
   });
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Pickup',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#960000',
+      sound: 'default',
+    });
+  }
 }

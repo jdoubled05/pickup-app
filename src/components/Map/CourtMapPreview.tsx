@@ -1,8 +1,13 @@
 import React, { useMemo } from "react";
 import { Pressable, View, useColorScheme } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import MapLibreRN from "@maplibre/maplibre-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text } from "@/src/components/ui/Text";
+
+MapLibreRN.setAccessToken(null);
+
+const TILE_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+const TILE_STYLE_DARK = "https://tiles.openfreemap.org/styles/dark";
 
 type CourtMapPreviewProps = {
   latitude: number;
@@ -10,64 +15,40 @@ type CourtMapPreviewProps = {
   onPress: () => void;
 };
 
-const DELTA = 0.004; // ~400m view
-
 export function CourtMapPreview({ latitude, longitude, onPress }: CourtMapPreviewProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
-  const region = useMemo(
-    () => ({
-      latitude,
-      longitude,
-      latitudeDelta: DELTA,
-      longitudeDelta: DELTA,
-    }),
-    [latitude, longitude]
+  const coordinate = useMemo<[number, number]>(
+    () => [longitude, latitude],
+    [longitude, latitude]
   );
-
-  const mapStyle = useMemo(() => {
-    if (!isDark) return [];
-    return [
-      { elementType: "geometry", stylers: [{ color: "#1d2026" }] },
-      { elementType: "labels.text.fill", stylers: [{ color: "#8a8a8a" }] },
-      { elementType: "labels.text.stroke", stylers: [{ color: "#1d2026" }] },
-      { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#4a4a4a" }] },
-      { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#6f6f6f" }] },
-      { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-      { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-      { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-      { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-      { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-      { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-    ];
-  }, [isDark]);
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityLabel="View court on full map"
       accessibilityRole="button"
-      style={{ height: 180, borderRadius: 16, overflow: "hidden" }}
+      style={{ height: 180, borderRadius: 16, overflow: "hidden", backgroundColor: "#000" }}
+      renderToHardwareTextureAndroid
     >
-      <MapView
+      <MapLibreRN.MapView
         style={{ flex: 1 }}
-        provider={PROVIDER_DEFAULT}
-        initialRegion={region}
-        customMapStyle={mapStyle}
+        mapStyle={isDark ? TILE_STYLE_DARK : TILE_STYLE_LIGHT}
         scrollEnabled={false}
         zoomEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
-        showsCompass={false}
-        showsScale={false}
-        toolbarEnabled={false}
-        pointerEvents="none"
+        attributionEnabled={false}
+        logoEnabled={false}
+        compassEnabled={false}
       >
-        <Marker coordinate={{ latitude, longitude }} tracksViewChanges={false}>
+        <MapLibreRN.Camera
+          centerCoordinate={coordinate}
+          zoomLevel={14}
+          animationDuration={0}
+        />
+        <MapLibreRN.PointAnnotation id="court-pin" coordinate={coordinate}>
           <View
             style={{
               width: 36,
@@ -78,17 +59,18 @@ export function CourtMapPreview({ latitude, longitude, onPress }: CourtMapPrevie
               justifyContent: "center",
               borderWidth: 2.5,
               borderColor: "#fff",
+              elevation: 4,
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.4,
               shadowRadius: 3,
-              elevation: 4,
             }}
           >
             <Ionicons name="basketball" size={16} color="#fff" />
           </View>
-        </Marker>
-      </MapView>
+          <MapLibreRN.Callout title="" />
+        </MapLibreRN.PointAnnotation>
+      </MapLibreRN.MapView>
 
       {/* "View on Map" badge */}
       <View

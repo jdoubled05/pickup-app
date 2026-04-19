@@ -1,10 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, View, useColorScheme } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT, Region } from "react-native-maps";
+import MapLibreRN from "@maplibre/maplibre-react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Supercluster from "supercluster";
 import { Court } from "@/src/services/courts";
 import { Text } from "@/src/components/ui/Text";
+
+MapLibreRN.setAccessToken(null);
+
+const TILE_STYLE_LIGHT = "https://tiles.openfreemap.org/styles/liberty";
+const TILE_STYLE_DARK = "https://tiles.openfreemap.org/styles/dark";
+
+// Mirrors the react-native-maps Region shape so map.tsx doesn't need to change
+export type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
 
 type CourtsMapProps = {
   center: { lat: number; lon: number };
@@ -17,20 +30,21 @@ type CourtsMapProps = {
 
 type CourtFeature = Supercluster.PointFeature<{ courtId: string; isHot: boolean }>;
 
-function regionToZoom(region: Region): number {
-  const zoom = Math.round(Math.log(360 / region.longitudeDelta) / Math.LN2);
-  return Math.min(Math.max(zoom, 0), 20);
+// MapLibre visibleBounds: [[neLon, neLat], [swLon, swLat]]
+function boundsToRegion(
+  visibleBounds: [[number, number], [number, number]],
+  center: [number, number]
+): Region {
+  const [[neLon, neLat], [swLon, swLat]] = visibleBounds;
+  return {
+    latitude: center[1],
+    longitude: center[0],
+    latitudeDelta: Math.abs(neLat - swLat),
+    longitudeDelta: Math.abs(neLon - swLon),
+  };
 }
 
-function regionToBBox(region: Region): [number, number, number, number] {
-  const w = Math.max(region.longitude - region.longitudeDelta / 2, -180);
-  const s = Math.max(region.latitude - region.latitudeDelta / 2, -85);
-  const e = Math.min(region.longitude + region.longitudeDelta / 2, 180);
-  const n = Math.min(region.latitude + region.latitudeDelta / 2, 85);
-  return [w, s, e, n];
-}
-
-export function CourtsMap({
+function CourtsMapComponent({
   center,
   courts,
   courtActivity,
@@ -39,16 +53,14 @@ export function CourtsMap({
   onRegionChangeComplete,
 }: CourtsMapProps) {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const mapRef = useRef<MapView>(null);
+  const isDark = colorScheme === "dark";
+  const cameraRef = useRef<React.ElementRef<typeof MapLibreRN.Camera>>(null);
   const centerRef = useRef(center);
   useEffect(() => { centerRef.current = center; }, [center]);
-  const [region, setRegion] = useState<Region>({
-    latitude: center.lat,
-    longitude: center.lon,
-    latitudeDelta: 0.1,
-    longitudeDelta: 0.1,
-  });
+
+  // Track current zoom so clusters can be computed
+  const [zoom, setZoom] = useState(12);
+  const [visibleBounds, setVisibleBounds] = useState<[[number, number], [number, number]] | null>(null);
 
   const courtsWithCoords = useMemo(
     () =>
@@ -64,7 +76,6 @@ export function CourtsMap({
     [courts]
   );
 
-  // Build supercluster index whenever courts or activity changes
   const supercluster = useMemo(() => {
     const sc = new Supercluster<{ courtId: string; isHot: boolean }>({
       radius: 30,
@@ -87,25 +98,29 @@ export function CourtsMap({
     return sc;
   }, [courtsWithCoords, courtActivity]);
 
-  // Compute visible clusters for the current region
   const clusters = useMemo(() => {
-    const zoom = regionToZoom(region);
-    const bbox = regionToBBox(region);
+    if (!visibleBounds) {
+      // Use a wide bbox until the first region change fires
+      return supercluster.getClusters([-180, -85, 180, 85], zoom);
+    }
+    const [[neLon, neLat], [swLon, swLat]] = visibleBounds;
+    const bbox: [number, number, number, number] = [
+      Math.min(swLon, neLon),
+      Math.min(swLat, neLat),
+      Math.max(swLon, neLon),
+      Math.max(swLat, neLat),
+    ];
     return supercluster.getClusters(bbox, zoom);
-  }, [supercluster, region]);
+  }, [supercluster, visibleBounds, zoom]);
 
   // Animate to device location on recenter signal
   useEffect(() => {
     if (typeof recenterSignal === "number" && recenterSignal > 0) {
-      mapRef.current?.animateToRegion(
-        {
-          latitude: centerRef.current.lat,
-          longitude: centerRef.current.lon,
-          latitudeDelta: 0.1,
-          longitudeDelta: 0.1,
-        },
-        600
-      );
+      cameraRef.current?.setCamera({
+        centerCoordinate: [centerRef.current.lon, centerRef.current.lat],
+        zoomLevel: 12,
+        animationDuration: 600,
+      });
     }
   }, [recenterSignal]);
 
@@ -116,83 +131,82 @@ export function CourtsMap({
     [onSelectCourt]
   );
 
-  // Zoom into a cluster when tapped
   const handleClusterPress = useCallback(
-    (clusterId: number, coordinate: { latitude: number; longitude: number }) => {
+    (clusterId: number, coordinate: [number, number]) => {
       const expansionZoom = Math.min(
         supercluster.getClusterExpansionZoom(clusterId),
         17
       );
-      const longitudeDelta = 360 / Math.pow(2, expansionZoom);
-      const latitudeDelta = longitudeDelta;
-      mapRef.current?.animateToRegion(
-        {
-          latitude: coordinate.latitude,
-          longitude: coordinate.longitude,
-          latitudeDelta,
-          longitudeDelta,
-        },
-        400
-      );
+      cameraRef.current?.setCamera({
+        centerCoordinate: coordinate,
+        zoomLevel: expansionZoom,
+        animationDuration: 400,
+      });
     },
     [supercluster]
   );
 
-  const mapStyle = useMemo(() => {
-    if (!isDark) return [];
-    return [
-      { elementType: "geometry", stylers: [{ color: "#1d2026" }] },
-      { elementType: "labels.text.fill", stylers: [{ color: "#8a8a8a" }] },
-      { elementType: "labels.text.stroke", stylers: [{ color: "#1d2026" }] },
-      { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#4a4a4a" }] },
-      { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#6f6f6f" }] },
-      { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
-      { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
-      { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
-      { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
-      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-      { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
-      { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
-      { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
-      { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-      { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
-      { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
-    ];
-  }, [isDark]);
+  const handleRegionDidChange = useCallback(
+    (feature: GeoJSON.Feature<GeoJSON.Point>) => {
+      const props = feature.properties as {
+        zoomLevel: number;
+        visibleBounds: [[number, number], [number, number]];
+        isUserInteraction: boolean;
+      } | null;
+      if (!props) return;
+
+      const { zoomLevel, visibleBounds: bounds, isUserInteraction } = props;
+      setZoom(Math.round(zoomLevel));
+      setVisibleBounds(bounds);
+
+      // Only fetch courts when the user actually moved the map, not on programmatic
+      // camera moves (recenter, search navigation) — those already fetch directly.
+      if (onRegionChangeComplete && isUserInteraction) {
+        const center = feature.geometry.coordinates as [number, number];
+        onRegionChangeComplete(boundsToRegion(bounds, center));
+      }
+    },
+    [onRegionChangeComplete]
+  );
 
   return (
-    <MapView
-      ref={mapRef}
+    <MapLibreRN.MapView
       style={{ flex: 1 }}
-      provider={PROVIDER_DEFAULT}
-      initialRegion={region}
-      showsUserLocation
-      showsMyLocationButton={false}
-      showsCompass
-      customMapStyle={mapStyle}
-      onRegionChangeComplete={(r) => {
-        setRegion(r);
-        onRegionChangeComplete?.(r);
-      }}
+      mapStyle={isDark ? TILE_STYLE_DARK : TILE_STYLE_LIGHT}
+      attributionEnabled={false}
+      logoEnabled={false}
+      compassEnabled
+      onRegionDidChange={handleRegionDidChange}
     >
+      <MapLibreRN.Camera
+        ref={cameraRef}
+        defaultSettings={{
+          centerCoordinate: [center.lon, center.lat],
+          zoomLevel: 12,
+        }}
+      />
+
+      <MapLibreRN.UserLocation visible renderMode="normal" />
+
       {clusters.map((cluster) => {
         const [longitude, latitude] = cluster.geometry.coordinates;
-        const coordinate = { latitude, longitude };
+        const coordinate: [number, number] = [longitude, latitude];
 
         // Cluster marker
-        if ('cluster' in cluster.properties && cluster.properties.cluster) {
-          const { cluster_id, point_count } = cluster.properties as Supercluster.ClusterProperties;
+        if ("cluster" in cluster.properties && cluster.properties.cluster) {
+          const { cluster_id, point_count } =
+            cluster.properties as Supercluster.ClusterProperties;
 
-          // Check if any court in this cluster is hot
           const leaves = supercluster.getLeaves(cluster_id, Infinity);
-          const hasHot = leaves.some((leaf) => (leaf.properties as { isHot: boolean }).isHot);
+          const hasHot = leaves.some(
+            (leaf) => (leaf.properties as { isHot: boolean }).isHot
+          );
 
           return (
-            <Marker
+            <MapLibreRN.MarkerView
               key={`cluster-${cluster_id}`}
               coordinate={coordinate}
-              onPress={() => handleClusterPress(cluster_id, coordinate)}
-              tracksViewChanges={false}
+              allowOverlap
             >
               <Pressable
                 onPress={() => handleClusterPress(cluster_id, coordinate)}
@@ -200,16 +214,16 @@ export function CourtsMap({
                   width: 44,
                   height: 44,
                   borderRadius: 22,
-                  backgroundColor: hasHot ? "#960000" : (isDark ? "#222" : "#fff"),
+                  backgroundColor: hasHot ? "#960000" : isDark ? "#222" : "#fff",
                   borderWidth: 2.5,
                   borderColor: "#960000",
                   alignItems: "center",
                   justifyContent: "center",
+                  elevation: 5,
                   shadowColor: "#000",
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.3,
                   shadowRadius: 4,
-                  elevation: 5,
                 }}
               >
                 {hasHot && (
@@ -226,66 +240,49 @@ export function CourtsMap({
                   {point_count}
                 </Text>
               </Pressable>
-            </Marker>
+            </MapLibreRN.MarkerView>
           );
         }
 
         // Individual court marker
-        const { courtId, isHot } = cluster.properties as { courtId: string; isHot: boolean };
+        const { courtId, isHot } = cluster.properties as {
+          courtId: string;
+          isHot: boolean;
+        };
         const court = courtsWithCoords.find((c) => c.id === courtId);
         if (!court) return null;
 
         return (
-          <Marker
+          <MapLibreRN.MarkerView
             key={courtId}
             coordinate={coordinate}
-            onPress={() => handleMarkerPress(courtId)}
-            title={court.name}
-            tracksViewChanges={false}
+            allowOverlap
           >
-            <View style={{ alignItems: "center", justifyContent: "center" }}>
+            <Pressable onPress={() => handleMarkerPress(courtId)}>
               {isHot ? (
                 <View style={{ alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name="location" size={44} color="#960000" />
                   <View
                     style={{
-                      shadowColor: "#000",
-                      shadowOffset: { width: 0, height: 3 },
-                      shadowOpacity: 0.4,
-                      shadowRadius: 4,
-                      elevation: 6,
+                      position: "absolute",
+                      top: 6,
+                      left: 0,
+                      right: 0,
+                      alignItems: "center",
                     }}
                   >
-                    <Ionicons name="location" size={44} color="#960000" />
-                    <View
-                      style={{
-                        position: "absolute",
-                        top: 6,
-                        left: 0,
-                        right: 0,
-                        alignItems: "center",
-                      }}
-                    >
-                      <Text style={{ fontSize: 14 }}>🔥</Text>
-                    </View>
+                    <Text style={{ fontSize: 14 }}>🔥</Text>
                   </View>
                 </View>
               ) : (
-                <View
-                  style={{
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: 0.35,
-                    shadowRadius: 4,
-                    elevation: 5,
-                  }}
-                >
-                  <Ionicons name="location" size={36} color="#960000" />
-                </View>
+                <Ionicons name="location" size={36} color="#960000" />
               )}
-            </View>
-          </Marker>
+            </Pressable>
+          </MapLibreRN.MarkerView>
         );
       })}
-    </MapView>
+    </MapLibreRN.MapView>
   );
 }
+
+export const CourtsMap = React.memo(CourtsMapComponent);

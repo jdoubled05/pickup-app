@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from "react";
-import { AppState, View, Pressable, ScrollView, Animated, Share, useColorScheme } from "react-native";
+import { AppState, View, Pressable, ScrollView, Animated, Share, useColorScheme, Platform } from "react-native";
 import * as Linking from "expo-linking";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
@@ -296,7 +296,11 @@ export default function CourtDetails() {
                 accessibilityLabel="Go back"
                 accessibilityRole="button"
               >
-                <Text className="text-xl text-gray-900 dark:text-white">←</Text>
+                <Ionicons
+                  name={Platform.OS === 'ios' ? 'chevron-back' : 'arrow-back'}
+                  size={22}
+                  color={isDark ? '#ffffff' : '#111827'}
+                />
               </Pressable>
               {saved && (
                 <View className="rounded-full bg-vibrant-gold/20 px-3 py-1">

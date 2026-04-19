@@ -73,6 +73,7 @@ export function BottomSheetCourtPreview({
 
   return (
     <Animated.View
+      pointerEvents="box-none"
       style={{
         transform: [{ translateY }],
         opacity,

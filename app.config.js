@@ -27,9 +27,8 @@ module.exports = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#ffffff",
       foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
+      backgroundColor: "#ffffff",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
     edgeToEdgeEnabled: true,

@@ -1,12 +1,11 @@
 import React, { useRef } from "react";
 import { ActivityIndicator, Pressable, TextInput, View, useColorScheme } from "react-native";
-import { Region } from "react-native-maps";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Text } from "@/src/components/ui/Text";
 import { Button } from "@/src/components/ui/Button";
-import { CourtsMap } from "@/src/components/Map/CourtsMap";
+import { CourtsMap, Region } from "@/src/components/Map/CourtsMap";
 import { BottomSheetCourtPreview } from "@/src/components/Map/BottomSheetCourtPreview";
 import { Court, listCourtsNearby, searchCourts } from "@/src/services/courts";
 import {
@@ -219,12 +218,12 @@ export default function MapsTest() {
     return unsubscribe;
   }, [courts, supabaseStatus.configured]);
 
-  const handleSelectCourt = (courtId: string) => {
+  const handleSelectCourt = React.useCallback((courtId: string) => {
     const court = courts.find((c) => c.id === courtId);
     if (court) {
       setSelectedCourt(court);
     }
-  };
+  }, [courts]);
 
   const handleClosePreview = () => {
     setSelectedCourt(null);
@@ -365,7 +364,11 @@ export default function MapsTest() {
   }, [searchText, searchFocused, courts, suggestionResults]);
 
   const mappableCourts = React.useMemo(() => {
-    const filtered = applyFilters(courts, filters);
+    // On the map, skip the distance filter — the viewport already constrains the
+    // visible area, so applying a "within X miles of user" filter would hide all
+    // courts when the map is panned to a different city.
+    const mapFilters = { ...filters, maxDistanceMiles: Infinity };
+    const filtered = applyFilters(courts, mapFilters);
     return filtered.filter(
       (court) =>
         typeof court.latitude === "number" &&
