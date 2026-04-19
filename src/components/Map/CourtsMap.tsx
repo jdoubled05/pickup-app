@@ -180,10 +180,9 @@ function CourtsMapComponent({
     >
       <MapLibreRN.Camera
         ref={cameraRef}
-        defaultSettings={{
-          centerCoordinate: [center.lon, center.lat],
-          zoomLevel: 12,
-        }}
+        centerCoordinate={[center.lon, center.lat]}
+        zoomLevel={12}
+        animationDuration={0}
       />
 
       <MapLibreRN.UserLocation visible renderMode="normal" />

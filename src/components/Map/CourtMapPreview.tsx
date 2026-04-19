@@ -48,7 +48,7 @@ export function CourtMapPreview({ latitude, longitude, onPress }: CourtMapPrevie
           zoomLevel={14}
           animationDuration={0}
         />
-        <MapLibreRN.PointAnnotation id="court-pin" coordinate={coordinate}>
+        <MapLibreRN.MarkerView coordinate={coordinate} allowOverlap>
           <View
             style={{
               width: 36,
@@ -68,8 +68,7 @@ export function CourtMapPreview({ latitude, longitude, onPress }: CourtMapPrevie
           >
             <Ionicons name="basketball" size={16} color="#fff" />
           </View>
-          <MapLibreRN.Callout title="" />
-        </MapLibreRN.PointAnnotation>
+        </MapLibreRN.MarkerView>
       </MapLibreRN.MapView>
 
       {/* "View on Map" badge */}
