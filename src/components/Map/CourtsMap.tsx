@@ -58,6 +58,14 @@ function CourtsMapComponent({
   const centerRef = useRef(center);
   useEffect(() => { centerRef.current = center; }, [center]);
 
+  // Memoize initial camera settings — defaultSettings only sets position on
+  // first mount. After that, camera is controlled imperatively via cameraRef.
+  const initialCameraSettings = useMemo(() => ({
+    centerCoordinate: [center.lon, center.lat] as [number, number],
+    zoomLevel: 12,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []); // intentionally empty — we only want this on mount
+
   // Track current zoom so clusters can be computed
   const [zoom, setZoom] = useState(12);
   const [visibleBounds, setVisibleBounds] = useState<[[number, number], [number, number]] | null>(null);
@@ -180,9 +188,7 @@ function CourtsMapComponent({
     >
       <MapLibreRN.Camera
         ref={cameraRef}
-        centerCoordinate={[center.lon, center.lat]}
-        zoomLevel={12}
-        animationDuration={0}
+        defaultSettings={initialCameraSettings}
       />
 
       <MapLibreRN.UserLocation visible renderMode="normal" />
