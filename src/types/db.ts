@@ -113,11 +113,15 @@ export function mapDbCourtToCourt(row: DbCourt): Court {
 export function mapDbCourtNearbyToCourt(row: DbCourtNearby): Court {
   const locationValue = typeof row.location === "string" ? row.location : null;
 
+  // Prefer direct lat/lon columns; fall back to parsing the location geometry
+  // in case lat/lon columns are null but location was populated via other means.
+  const coords = extractCoordinates(row);
+
   return {
     id: row.id,
     name: row.name ?? "Unknown court",
-    latitude: row.latitude,
-    longitude: row.longitude,
+    latitude: coords.latitude ?? undefined,
+    longitude: coords.longitude ?? undefined,
     description: row.description ?? null,
     location: locationValue,
     address: row.address ?? null,

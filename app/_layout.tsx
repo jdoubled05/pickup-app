@@ -3,6 +3,9 @@ import "../global.css";
 import { Stack, useRouter } from "expo-router";
 import { Pressable, useColorScheme } from "react-native";
 import { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
+
+SplashScreen.preventAutoHideAsync();
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Linking from "expo-linking";
 import * as Notifications from "expo-notifications";
@@ -19,14 +22,13 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  // Show onboarding on first launch; capture any deep link that arrived first
+  // Resolve initial route then hide the native splash
   useEffect(() => {
     Promise.all([
       hasCompletedOnboarding(),
       Linking.getInitialURL(),
     ]).then(([completed, initialUrl]) => {
       if (!completed) {
-        // Store the deep link so onboarding can navigate there on finish
         if (initialUrl) {
           const parsed = Linking.parse(initialUrl);
           if (parsed.path?.startsWith('court/')) {
@@ -35,6 +37,8 @@ export default function RootLayout() {
         }
         router.replace("/onboarding");
       }
+    }).finally(() => {
+      SplashScreen.hideAsync();
     });
   }, [router]);
 
@@ -74,6 +78,7 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: isDark ? "#000" : "#fff" },
         }}
       >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen
           name="onboarding"

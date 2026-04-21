@@ -283,7 +283,7 @@ export default function CourtsIndex() {
               ? require('@/assets/images/splash-icon-dark.png')
               : require('@/assets/images/splash-icon.png')
             }
-            style={{ height: 42, width: undefined, aspectRatio: 3 }}
+            style={{ height: 42, width: 119 }}
             resizeMode="contain"
           />
           {hotCourts.length > 0 && (
