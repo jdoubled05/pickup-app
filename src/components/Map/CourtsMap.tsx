@@ -58,13 +58,19 @@ function CourtsMapComponent({
   const centerRef = useRef(center);
   useEffect(() => { centerRef.current = center; }, [center]);
 
-  // Memoize initial camera settings — defaultSettings only sets position on
-  // first mount. After that, camera is controlled imperatively via cameraRef.
-  const initialCameraSettings = useMemo(() => ({
-    centerCoordinate: [center.lon, center.lat] as [number, number],
-    zoomLevel: 12,
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), []); // intentionally empty — we only want this on mount
+  // Set initial camera position imperatively after mount — avoids Android bug
+  // where defaultSettings re-applies on every re-render, snapping the map back.
+  const cameraInitialized = useRef(false);
+  useEffect(() => {
+    if (!cameraInitialized.current && cameraRef.current) {
+      cameraInitialized.current = true;
+      cameraRef.current.setCamera({
+        centerCoordinate: [centerRef.current.lon, centerRef.current.lat],
+        zoomLevel: 12,
+        animationDuration: 0,
+      });
+    }
+  });
 
   // Track current zoom so clusters can be computed
   const [zoom, setZoom] = useState(12);
@@ -186,10 +192,7 @@ function CourtsMapComponent({
       compassEnabled
       onRegionDidChange={handleRegionDidChange}
     >
-      <MapLibreRN.Camera
-        ref={cameraRef}
-        defaultSettings={initialCameraSettings}
-      />
+      <MapLibreRN.Camera ref={cameraRef} />
 
       <MapLibreRN.UserLocation visible renderMode="normal" />
 
